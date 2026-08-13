@@ -112,6 +112,7 @@ $("#navRightBtn").addEventListener("click", () => {
   if (isAdmin()) { showSettings(); } else { doLogout(); }
 });
 $("#settingsBtn").addEventListener("click", showSettings);
+$("#settingsLogoutBtn").addEventListener("click", doLogout);
 
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -500,23 +501,6 @@ $("#chequeForm").addEventListener("submit", async (e) => {
     $("#addFormStatus").textContent = err.message;
     $("#addFormStatus").classList.remove("hidden");
   }
-});
-
-$("#editForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const payload = {
-    ownerName: $("#editOwnerName").value.trim(),
-    tenantName: $("#editTenantName").value.trim(),
-    propertyDetail: $("#editPropertyDetail").value.trim(),
-    ownerBankDetail: $("#editOwnerBankDetail").value.trim(),
-    amount: parseFloat($("#editAmount").value),
-    chequeNumber: $("#editChequeNumber").value.trim(),
-    depositDate: $("#editDepositDate").value,
-    notes: $("#editNotes").value.trim(),
-  };
-  await api(`/api/cheques/${state.editingId}`, { method: "PUT", body: JSON.stringify(payload) });
-  closeEditModal();
-  await loadCheques();
 });
 
 // ---------- Settings ----------
