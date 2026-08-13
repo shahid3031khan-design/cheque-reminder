@@ -4,6 +4,9 @@
   "description": "Cheque Reminder - cloud-hosted version (Node.js/Express + MongoDB)",
   "main": "server.js",
   "type": "commonjs",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
