@@ -138,7 +138,7 @@ $("#loginForm").addEventListener("submit", async (e) => {
 
 $("#forgotPasswordLink").addEventListener("click", (e) => {
   e.preventDefault();
-  $("#loginError").textContent = "Only an admin can reset passwords, from Settings → Manage users. If you're locked out of the only admin account, delete data\\users.json in the app folder to restore the default admin/admin123 login.";
+  $("#loginError").textContent = "Only an admin can reset passwords, from Settings → Manage users.";
   $("#loginError").classList.remove("hidden");
 });
 
