@@ -138,7 +138,7 @@ $("#loginForm").addEventListener("submit", async (e) => {
 
 $("#forgotPasswordLink").addEventListener("click", (e) => {
   e.preventDefault();
-  $("#loginError").textContent = "Only an admin can reset passwords, from Settings → Manage users.";
+  $("#loginError").textContent = "Please refer to your admin in case of a forgotten password.";
   $("#loginError").classList.remove("hidden");
 });
 
