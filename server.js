@@ -93,6 +93,7 @@ app.put("/api/users/:id/password", auth.requireAdmin, async (req, res) => {
   if (!target) return res.status(404).json({ error: "User not found" });
   const pw = auth.newPasswordHash(req.body.password);
   await db.updateUserPassword(target.id, pw.hash, pw.salt);
+  auth.destroySessionsForUser(target.id); // force re-login with the new password everywhere
   res.json({ ok: true });
 });
 
@@ -103,6 +104,7 @@ app.delete("/api/users/:id", auth.requireAdmin, async (req, res) => {
     return res.status(400).json({ error: "Cannot delete the last admin account" });
   }
   await db.deleteUser(target.id);
+  auth.destroySessionsForUser(target.id); // revoke any sessions the deleted account still held
   res.json({ ok: true });
 });
 
