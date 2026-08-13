@@ -1,0 +1,19 @@
+{
+  "name": "cheque-reminder-cloud",
+  "version": "1.0.0",
+  "description": "Cheque Reminder - cloud-hosted version (Node.js/Express + MongoDB)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongodb": "^6.8.0",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^9.0.5"
+  }
+}

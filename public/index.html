@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Cheque Reminder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#2f8f7a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Cheques">
+<meta name="mobile-web-app-capable" content="yes">
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+  }
+</script>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen hidden">
+  <div class="login-illustration" aria-hidden="true">
+    <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="150" cy="170" rx="140" ry="150" fill="var(--green-soft)"/>
+      <path d="M40,60 C20,90 30,130 60,140 C70,100 65,70 40,60 Z" fill="var(--green)" opacity="0.55"/>
+      <path d="M250,90 C275,110 270,145 240,155 C230,120 230,95 250,90 Z" fill="var(--green)" opacity="0.4"/>
+      <rect x="85" y="30" width="130" height="240" rx="24" fill="var(--panel)" stroke="#2b2b3a" stroke-width="6"/>
+      <rect x="99" y="54" width="102" height="176" rx="10" fill="var(--green)"/>
+      <circle cx="150" cy="42" r="3" fill="#2b2b3a"/>
+      <rect x="130" y="258" width="40" height="5" rx="2.5" fill="#2b2b3a"/>
+      <rect x="120" y="270" width="16" height="46" rx="8" fill="#2b2b3a"/>
+      <rect x="150" y="270" width="16" height="46" rx="8" fill="#2b2b3a"/>
+      <ellipse cx="128" cy="318" rx="12" ry="7" fill="#5b3a29"/>
+      <ellipse cx="158" cy="318" rx="12" ry="7" fill="#5b3a29"/>
+      <rect x="115" y="222" width="62" height="56" rx="16" fill="#ffffff" stroke="#2b2b3a" stroke-width="3"/>
+      <path d="M146,224 L154,224 L150,250 Z" fill="var(--green)"/>
+      <rect x="100" y="228" width="16" height="40" rx="8" fill="#ffffff" stroke="#2b2b3a" stroke-width="3"/>
+      <rect x="176" y="228" width="16" height="40" rx="8" fill="#ffffff" stroke="#2b2b3a" stroke-width="3"/>
+      <circle cx="146" cy="200" r="22" fill="#f4c9a8"/>
+      <path d="M124,195 C124,175 168,175 168,195 C160,185 132,185 124,195 Z" fill="#2b2b3a"/>
+    </svg>
+  </div>
+  <div class="login-panel">
+  <div class="login-card">
+    <div class="login-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-1.5a4.5 4.5 0 0 0-4.5-4.5h-7A4.5 4.5 0 0 0 4 19.5V21"/><circle cx="12" cy="7.5" r="4"/></svg></div>
+    <p class="eyebrow center">Cheque Reminder</p>
+    <h1 class="login-title">Sign in</h1>
+    <form id="loginForm">
+      <label>Username
+        <input type="text" id="loginUsername" required autocomplete="username" placeholder="admin or employee">
+      </label>
+      <label>Password
+        <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••">
+      </label>
+      <div class="login-row">
+        <label class="checkbox-label"><input type="checkbox" id="rememberMe" checked> Remember me</label>
+        <a href="#" id="forgotPasswordLink">Forgot password?</a>
+      </div>
+      <p id="loginError" class="login-error hidden"></p>
+      <button type="submit" class="primary full-width">Login</button>
+    </form>
+    <p class="hint center">Default logins: <strong>admin / admin123</strong> or <strong>employee / employee123</strong> — change these from Settings after signing in.</p>
+  </div>
+  </div>
+</div>
+
+<div id="appRoot" class="hidden">
+<div class="app">
+
+  <header class="topbar">
+    <div>
+      <p class="eyebrow" id="todayLabel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3.5" y1="10" x2="20.5" y2="10"/></svg><span id="todayLabelText">Today</span></p>
+      <h1>Cheque Reminder</h1>
+    </div>
+    <div class="topbar-right">
+      <span id="userBadge" class="user-badge"></span>
+      <button id="settingsBtn" class="icon-btn hidden" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+    </div>
+  </header>
+
+  <section class="stats" id="stats">
+    <div class="stat-card stat-urgent">
+      <span class="stat-icon-badge badge-mint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3.5" y1="10" x2="20.5" y2="10"/></svg></span>
+      <span class="stat-num" id="statUrgent">0</span>
+      <span class="stat-label">Due in 3 days</span>
+    </div>
+    <div class="stat-card stat-soon">
+      <span class="stat-icon-badge badge-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3.5" y1="10" x2="20.5" y2="10"/></svg></span>
+      <span class="stat-num" id="statWeek">0</span>
+      <span class="stat-label">Due this week</span>
+    </div>
+    <div class="stat-card stat-overdue">
+      <span class="stat-icon-badge badge-coral"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 22 20.5H2Z"/><line x1="12" y1="9.5" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg></span>
+      <span class="stat-num" id="statOverdue">0</span>
+      <span class="stat-label">Overdue</span>
+    </div>
+    <div class="stat-card stat-total">
+      <span class="stat-icon-badge badge-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><polyline points="14 3 14 8 19 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>
+      <span class="stat-num" id="statPending">0</span>
+      <span class="stat-label">Pending total</span>
+    </div>
+  </section>
+
+  <section class="list-section">
+    <div class="list-header">
+      <h2>Cheques</h2>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-filter="active">Active</button>
+        <button class="tab" data-filter="urgent">Urgent</button>
+        <button class="tab" data-filter="overdue">Overdue</button>
+        <button class="tab" data-filter="deposited">Deposited</button>
+        <button class="tab" data-filter="all">All</button>
+      </div>
+    </div>
+    <div id="emptyState" class="empty-state hidden">
+      <p>No cheques here yet.</p>
+      <p class="hint" id="emptyHint">Tap the + button below to add one.</p>
+    </div>
+    <div id="chequeList" class="cheque-cards"></div>
+  </section>
+
+</div>
+
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="nav-item active" data-nav="home">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9"/></svg></span>
+      <span class="nav-label">Home</span>
+    </button>
+    <div class="nav-fab-slot">
+      <button class="nav-fab hidden" id="addBtn" aria-label="Add cheque">+</button>
+    </div>
+    <button class="nav-item" id="navRightBtn">
+      <span class="nav-icon" id="navRightIcon"></span>
+      <span class="nav-label" id="navRightLabel">Settings</span>
+    </button>
+  </div>
+</nav>
+
+<div id="addModal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2 id="chequeFormTitle">Add cheques</h2>
+      <button id="closeAddBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <form id="chequeForm">
+      <label>Owner name
+        <input type="text" id="ownerName" required placeholder="e.g. Mr. Farhan Ahmed">
+      </label>
+      <label>Tenant name
+        <input type="text" id="tenantName" required placeholder="e.g. Ali Traders">
+      </label>
+      <label>Property detail
+        <input type="text" id="propertyDetail" placeholder="e.g. Flat 4B, Clifton Block">
+      </label>
+      <label>Owner bank detail
+        <input type="text" id="ownerBankDetail" placeholder="e.g. HBL - 0123-4567890-01">
+      </label>
+      <label>Notes
+        <input type="text" id="notes" placeholder="optional, applies to all cheques below">
+      </label>
+
+      <div class="installments-header">
+        <span>Number of cheques</span>
+        <span class="hint" id="installmentsTotal">Total: 0.00 · 0 cheque(s)</span>
+      </div>
+      <div id="installmentRows" class="installment-rows"></div>
+      <button type="button" id="addRowBtn" class="secondary add-row-btn">+ Add another cheque</button>
+
+      <div class="form-actions">
+        <button type="submit" id="submitBtn" class="primary">Add cheque(s)</button>
+        <button type="button" id="cancelChequeFormBtn" class="secondary">Cancel</button>
+      </div>
+      <p id="addFormStatus" class="login-error hidden"></p>
+    </form>
+  </div>
+</div>
+
+<div id="dealModal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2 id="dealTitle">Deal</h2>
+      <button id="closeDealBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <p class="hint" id="dealSubtitle"></p>
+    <div class="deal-stats" id="dealStats"></div>
+    <div id="dealChequeList" class="deal-cheque-list"></div>
+  </div>
+</div>
+
+<div id="settingsModal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2>Settings</h2>
+      <button id="closeSettingsBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <form id="settingsForm">
+      <label>Currency symbol
+        <input type="text" id="currencySymbol" maxlength="4" style="max-width:80px">
+      </label>
+
+      <fieldset>
+        <legend><label><input type="checkbox" id="emailEnabled"> Email reminders</label></legend>
+        <p class="hint">Use a Gmail <strong>App Password</strong> (Google Account → Security → 2-Step Verification → App passwords), not your normal password.</p>
+        <label>Your Gmail address
+          <input type="email" id="smtpUser" placeholder="you@gmail.com">
+        </label>
+        <label>Gmail App Password
+          <input type="text" id="smtpAppPassword" placeholder="xxxx xxxx xxxx xxxx">
+        </label>
+        <label>Send reminders to
+          <input type="email" id="emailTo" placeholder="you@gmail.com">
+        </label>
+        <button type="button" class="secondary test-btn" data-channel="email">Send test</button>
+      </fieldset>
+
+      <fieldset>
+        <legend><label><input type="checkbox" id="whatsappEnabled"> WhatsApp reminders</label></legend>
+        <p class="hint">Free via CallMeBot: add contact <strong>+34 644 84 71 65</strong> in WhatsApp, send it the message <strong>"I allow callmebot to send me messages"</strong>, and it will reply with your personal API key.</p>
+        <label>Your WhatsApp number (with country code, no + or spaces)
+          <input type="text" id="waPhone" placeholder="919999999999">
+        </label>
+        <label>CallMeBot API key
+          <input type="text" id="waApiKey" placeholder="123456">
+        </label>
+        <button type="button" class="secondary test-btn" data-channel="whatsapp">Send test</button>
+      </fieldset>
+
+      <fieldset>
+        <legend><label><input type="checkbox" id="pushEnabled"> Phone push notifications</label></legend>
+        <p class="hint">Free via ntfy: install the <strong>ntfy</strong> app (Android/iOS), subscribe to a topic name only you know, and enter that same topic name below.</p>
+        <label>ntfy topic name
+          <input type="text" id="ntfyTopic" placeholder="cheque-reminder-yourname-1234">
+        </label>
+        <button type="button" class="secondary test-btn" data-channel="push">Send test</button>
+      </fieldset>
+
+      <div class="form-actions">
+        <button type="submit" class="primary">Save settings</button>
+      </div>
+      <p id="settingsStatus" class="hint"></p>
+    </form>
+
+    <div class="users-section">
+      <div class="installments-header">
+        <span>Manage users</span>
+      </div>
+      <div id="usersList" class="users-list"></div>
+
+      <form id="addUserForm" class="add-user-form">
+        <div class="form-row">
+          <label>Username
+            <input type="text" id="newUsername" required placeholder="e.g. sara">
+          </label>
+          <label>Display name
+            <input type="text" id="newDisplayName" placeholder="optional">
+          </label>
+        </div>
+        <div class="form-row">
+          <label>Password
+            <input type="text" id="newUserPassword" required placeholder="temporary password">
+          </label>
+          <label>Role
+            <select id="newUserRole">
+              <option value="employee">Employee (view only)</option>
+              <option value="admin">Admin (full access)</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="secondary full-width">+ Add user</button>
+      </form>
+      <p id="usersStatus" class="login-error hidden"></p>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
