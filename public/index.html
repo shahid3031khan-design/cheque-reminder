@@ -177,6 +177,50 @@
     </div>
   </div>
 
+  <div id="callsView" class="hidden">
+    <div class="tracker-header">
+      <h2>Calls</h2>
+      <select id="callsEmployeeSelect" class="hidden"></select>
+    </div>
+
+    <div class="tracker-cal-card">
+      <div class="tracker-cal-nav">
+        <button type="button" id="callsPrevMonth" class="icon-btn" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg></button>
+        <span id="callsMonthLabel">Month Year</span>
+        <button type="button" id="callsNextMonth" class="icon-btn" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+      </div>
+      <div class="tracker-cal-weekdays">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+      <div class="tracker-cal-grid" id="callsCalGrid"></div>
+    </div>
+
+    <div class="tracker-day-panel">
+      <h3 id="callsSelectedDateLabel">Today</h3>
+
+      <div class="calls-stats-row">
+        <div class="calls-stat"><span class="calls-stat-num" id="callsStatCount">0</span><span class="calls-stat-label">Calls</span></div>
+        <div class="calls-stat"><span class="calls-stat-num" id="callsStatMinutes">0</span><span class="calls-stat-label">Minutes</span></div>
+      </div>
+
+      <div class="tracker-section" id="callAddSection">
+        <label class="tracker-section-label">Add a call</label>
+        <div class="call-add-row">
+          <input type="number" id="callDurationInput" placeholder="Minutes" min="1" step="1">
+          <input type="text" id="callNoteInput" placeholder="Note (optional)">
+        </div>
+        <button type="button" id="callAddBtn" class="primary full-width">Add call</button>
+        <p id="callAddStatus" class="hint"></p>
+      </div>
+
+      <div class="tracker-section">
+        <label class="tracker-section-label">Today's calls</label>
+        <div class="calls-list" id="callsList"></div>
+        <p id="callsEmptyState" class="hint hidden">No calls logged for this day.</p>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <nav class="bottom-nav">
@@ -193,6 +237,10 @@
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6"/></svg></span>
       <span class="nav-label">Tasks</span>
     </button>
+    <button class="nav-item" data-nav="calls">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 4 6a2 2 0 0 1 0-2Z"/></svg></span>
+      <span class="nav-label">Calls</span>
+    </button>
     <button class="nav-item" id="navRightBtn">
       <span class="nav-icon" id="navRightIcon"></span>
       <span class="nav-label" id="navRightLabel">Settings</span>
@@ -200,7 +248,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version">v1.11</div>
+<div id="appVersion" class="app-version">v1.2</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>

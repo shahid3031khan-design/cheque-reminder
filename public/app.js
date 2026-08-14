@@ -20,6 +20,13 @@ const state = {
   taskEmployees: [],
   taskEmployeesLoaded: false,
   taskPriority: "medium",
+  callsYear: new Date().getFullYear(),
+  callsMonth: new Date().getMonth() + 1,
+  callsSelectedDate: todayStr(),
+  callsTargetUserId: null,
+  callsMonthAgg: [],
+  callsDayEntries: [],
+  callsEmployeesLoaded: false,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -137,6 +144,7 @@ function switchView(view) {
   $("#homeView").classList.toggle("hidden", view !== "home");
   $("#trackerView").classList.toggle("hidden", view !== "tracker");
   $("#tasksView").classList.toggle("hidden", view !== "tasks");
+  $("#callsView").classList.toggle("hidden", view !== "calls");
   $("#pageTitle").classList.toggle("hidden", view !== "home");
   updateAddBtnVisibility();
   document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
@@ -144,6 +152,7 @@ function switchView(view) {
   });
   if (view === "tracker") openTrackerView();
   if (view === "tasks") openTasksView();
+  if (view === "calls") openCallsView();
 }
 
 document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
@@ -855,6 +864,175 @@ $("#addTaskForm").addEventListener("submit", async (e) => {
     $("#addTaskStatus").textContent = err.message || "Failed to create task.";
     $("#addTaskStatus").classList.remove("hidden");
   }
+});
+
+// ---------- Calls (employee logs each call they make) ----------
+
+function callsUserIdParam() {
+  return isAdmin() && state.callsTargetUserId ? state.callsTargetUserId : "";
+}
+
+async function openCallsView() {
+  if (isAdmin() && !state.callsEmployeesLoaded) {
+    await loadCallsEmployeeOptions();
+  }
+  await loadCallsMonth();
+  renderCallsCalendar();
+  await selectCallsDay(state.callsSelectedDate);
+}
+
+async function loadCallsEmployeeOptions() {
+  const allUsers = await api("/api/users");
+  state.callsEmployeesLoaded = true;
+  state.callsTargetUserId = state.currentUser.id;
+  const select = $("#callsEmployeeSelect");
+  select.innerHTML = allUsers.map(u => `<option value="${u.id}"${u.id === state.currentUser.id ? " selected" : ""}>${escapeHtml(u.displayName || u.username)}${u.id === state.currentUser.id ? " (you)" : ""}</option>`).join("");
+  select.classList.remove("hidden");
+}
+
+$("#callsEmployeeSelect").addEventListener("change", async (e) => {
+  state.callsTargetUserId = e.target.value;
+  await loadCallsMonth();
+  renderCallsCalendar();
+  await selectCallsDay(state.callsSelectedDate);
+});
+
+async function loadCallsMonth() {
+  const qs = new URLSearchParams({ year: state.callsYear, month: state.callsMonth });
+  const uid = callsUserIdParam();
+  if (uid) qs.set("userId", uid);
+  state.callsMonthAgg = await api(`/api/calls/month?${qs.toString()}`);
+}
+
+function renderCallsCalendar() {
+  const year = state.callsYear, month = state.callsMonth;
+  $("#callsMonthLabel").textContent = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  const firstOfMonth = new Date(year, month - 1, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = todayStr();
+
+  const aggByDate = {};
+  state.callsMonthAgg.forEach((a) => { aggByDate[a.date] = a; });
+
+  let cells = "";
+  for (let i = 0; i < startOffset; i++) {
+    cells += `<button type="button" class="tracker-cal-day other-month" disabled></button>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const agg = aggByDate[dateStr];
+    const classes = ["tracker-cal-day"];
+    if (dateStr === today) classes.push("is-today");
+    if (dateStr === state.callsSelectedDate) classes.push("is-selected");
+    cells += `<button type="button" class="${classes.join(" ")}" data-date="${dateStr}">${d}${agg ? '<span class="entry-dot"></span>' : ""}</button>`;
+  }
+  $("#callsCalGrid").innerHTML = cells;
+}
+
+$("#callsCalGrid").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".tracker-cal-day[data-date]");
+  if (!btn) return;
+  await selectCallsDay(btn.dataset.date);
+});
+
+$("#callsPrevMonth").addEventListener("click", async () => {
+  state.callsMonth -= 1;
+  if (state.callsMonth < 1) { state.callsMonth = 12; state.callsYear -= 1; }
+  await loadCallsMonth();
+  renderCallsCalendar();
+});
+
+$("#callsNextMonth").addEventListener("click", async () => {
+  state.callsMonth += 1;
+  if (state.callsMonth > 12) { state.callsMonth = 1; state.callsYear += 1; }
+  await loadCallsMonth();
+  renderCallsCalendar();
+});
+
+async function selectCallsDay(dateStr) {
+  state.callsSelectedDate = dateStr;
+  document.querySelectorAll("#callsCalGrid .tracker-cal-day[data-date]").forEach((btn) => {
+    btn.classList.toggle("is-selected", btn.dataset.date === dateStr);
+  });
+  const isToday = dateStr === todayStr();
+  $("#callsSelectedDateLabel").textContent = isToday
+    ? `Today, ${new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}`
+    : new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  const qs = new URLSearchParams();
+  const uid = callsUserIdParam();
+  if (uid) qs.set("userId", uid);
+  state.callsDayEntries = await api(`/api/calls/day/${dateStr}?${qs.toString()}`);
+  renderCallsDay();
+}
+
+function renderCallsDay() {
+  const entries = state.callsDayEntries;
+  $("#callsStatCount").textContent = entries.length;
+  $("#callsStatMinutes").textContent = entries.reduce((sum, c) => sum + (Number(c.durationMinutes) || 0), 0);
+
+  const readOnly = isAdmin() && state.callsTargetUserId && state.callsTargetUserId !== state.currentUser.id;
+  $("#callAddSection").classList.toggle("hidden", readOnly);
+
+  const list = $("#callsList");
+  const empty = $("#callsEmptyState");
+  if (entries.length === 0) {
+    list.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  list.innerHTML = entries.map((c) => {
+    const time = new Date(c.createdAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    const canDelete = !readOnly && (isAdmin() || c.userId === state.currentUser.id);
+    return `
+      <div class="call-entry" data-id="${c.id}">
+        <span class="call-entry-duration">${c.durationMinutes} min</span>
+        <div class="call-entry-main">${c.note ? `<span class="call-entry-note">${escapeHtml(c.note)}</span>` : ""}</div>
+        <span class="call-entry-time">${time}</span>
+        ${canDelete ? `<button type="button" class="call-entry-delete" data-id="${c.id}">&times;</button>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+$("#callsList").addEventListener("click", async (e) => {
+  const delBtn = e.target.closest(".call-entry-delete");
+  if (!delBtn) return;
+  await api(`/api/calls/${delBtn.dataset.id}`, { method: "DELETE" });
+  await selectCallsDay(state.callsSelectedDate);
+  await loadCallsMonth();
+  renderCallsCalendar();
+});
+
+$("#callAddBtn").addEventListener("click", async () => {
+  const duration = Number($("#callDurationInput").value);
+  if (!duration || duration <= 0) {
+    $("#callAddStatus").textContent = "Enter a duration in minutes.";
+    return;
+  }
+  $("#callAddStatus").textContent = "Saving...";
+  try {
+    await api("/api/calls", {
+      method: "POST",
+      body: JSON.stringify({
+        date: state.callsSelectedDate,
+        durationMinutes: duration,
+        note: $("#callNoteInput").value.trim(),
+      }),
+    });
+    $("#callDurationInput").value = "";
+    $("#callNoteInput").value = "";
+    $("#callAddStatus").textContent = "Added.";
+    await selectCallsDay(state.callsSelectedDate);
+    await loadCallsMonth();
+    renderCallsCalendar();
+  } catch (err) {
+    $("#callAddStatus").textContent = err.message || "Failed to add call.";
+  }
+  setTimeout(() => { $("#callAddStatus").textContent = ""; }, 2000);
 });
 
 // ---------- Settings ----------

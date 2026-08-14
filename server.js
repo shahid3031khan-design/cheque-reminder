@@ -327,6 +327,65 @@ app.delete("/api/tasks/:id", auth.requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Calls (employee logs each call they make) ----------
+
+function resolveCallsUserId(req) {
+  // Employees can only ever see/add their own calls; admins may view anyone's via ?userId=
+  if (req.query.userId && req.user.role === "admin") return req.query.userId;
+  return req.user.userId;
+}
+
+app.get("/api/calls/day/:date", auth.requireAuth, async (req, res) => {
+  if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
+  const userId = resolveCallsUserId(req);
+  res.json(await db.getCallsForDay(userId, req.params.date));
+});
+
+app.get("/api/calls/month", auth.requireAuth, async (req, res) => {
+  const year = parseInt(req.query.year, 10);
+  const month = parseInt(req.query.month, 10);
+  if (!year || !month || month < 1 || month > 12) return res.status(400).json({ error: "Invalid year/month" });
+  const userId = resolveCallsUserId(req);
+  const entries = await db.getCallsMonth(userId, year, month);
+  const byDate = {};
+  for (const c of entries) {
+    if (!byDate[c.date]) byDate[c.date] = { date: c.date, count: 0, totalMinutes: 0 };
+    byDate[c.date].count += 1;
+    byDate[c.date].totalMinutes += Number(c.durationMinutes) || 0;
+  }
+  res.json(Object.values(byDate));
+});
+
+app.post("/api/calls", auth.requireAuth, async (req, res) => {
+  const date = req.body.date;
+  if (!DATE_RE.test(date)) return res.status(400).json({ error: "Invalid date" });
+  const duration = Number(req.body.durationMinutes);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return res.status(400).json({ error: "Duration must be a positive number of minutes" });
+  }
+  // Always the logged-in user's own call log - admins can view others' calls but not add on their behalf.
+  const call = {
+    id: db.newId("call"),
+    userId: req.user.userId,
+    date,
+    durationMinutes: duration,
+    note: String(req.body.note || "").slice(0, 500),
+    createdAt: new Date().toISOString(),
+  };
+  await db.createCall(call);
+  res.status(201).json(call);
+});
+
+app.delete("/api/calls/:id", auth.requireAuth, async (req, res) => {
+  const call = await db.findCallById(req.params.id);
+  if (!call) return res.status(404).json({ error: "Call not found" });
+  if (req.user.role !== "admin" && call.userId !== req.user.userId) {
+    return res.status(403).json({ error: "Not your call entry" });
+  }
+  await db.deleteCall(req.params.id);
+  res.json({ ok: true });
+});
+
 // ---------- Boot ----------
 
 async function start() {

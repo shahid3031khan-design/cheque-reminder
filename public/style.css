@@ -370,16 +370,16 @@ button svg { vertical-align: middle; }
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
-  padding: 8px 9px;
+  padding: 8px 6px;
   border-radius: 20px;
   white-space: nowrap;
 }
 .nav-item.active { color: var(--yellow-text); background: var(--yellow); }
 .nav-icon { line-height: 1; display: flex; }
-.nav-icon svg { width: 18px; height: 18px; }
-.nav-label { font-size: 0.72rem; font-weight: 600; }
+.nav-icon svg { width: 16px; height: 16px; }
+.nav-label { font-size: 0.62rem; font-weight: 600; }
 
 /* Small build-version watermark, bottom-left, purely informational -
    bump the number in index.html whenever a notable change ships. */
@@ -1148,3 +1148,72 @@ select {
   margin-bottom: 0;
 }
 .assignee-chip input { width: auto; padding: 0; accent-color: var(--yellow); }
+
+/* ---------- Calls ---------- */
+
+.calls-stats-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.calls-stat {
+  flex: 1;
+  background: var(--yellow-soft);
+  border-radius: 14px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.calls-stat-num { display: block; font-size: 1.3rem; font-weight: 800; }
+.calls-stat-label { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 600; }
+
+.call-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.call-add-row input { width: 100%; }
+
+.calls-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.call-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.call-entry-duration {
+  background: var(--yellow-soft);
+  color: var(--yellow-dark);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 3px 9px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.call-entry-main { flex: 1; min-width: 0; }
+.call-entry-note {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-entry-time { font-size: 0.7rem; color: var(--text-muted); flex-shrink: 0; }
+.call-entry-delete {
+  background: none;
+  border: none;
+  color: var(--red);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0 0 4px;
+  flex-shrink: 0;
+}
