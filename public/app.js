@@ -107,11 +107,17 @@ function showApp() {
   $("#appRoot").classList.remove("hidden");
 }
 
+function updateAddBtnVisibility() {
+  const show = isAdmin() && state.currentView === "home";
+  $(".nav-fab-slot").classList.toggle("hidden", !show);
+  $("#addBtn").classList.toggle("hidden", !show);
+}
+
 function applyRoleUI() {
   const admin = isAdmin();
   $("#userBadge").innerHTML = `${ICONS.user}${escapeHtml(state.currentUser.displayName || state.currentUser.username)} · <span class="role-${state.currentUser.role}">${state.currentUser.role}</span>`;
   $("#settingsBtn").classList.toggle("hidden", !admin);
-  $("#addBtn").classList.toggle("hidden", !admin);
+  updateAddBtnVisibility();
   $("#navRightIcon").innerHTML = admin ? ICONS.settings : ICONS.power;
   $("#navRightLabel").textContent = admin ? "Settings" : "Logout";
   $("#emptyHint").textContent = admin ? "Tap the + button below to add one." : "Nothing to show right now.";
@@ -121,6 +127,8 @@ function switchView(view) {
   state.currentView = view;
   $("#homeView").classList.toggle("hidden", view !== "home");
   $("#trackerView").classList.toggle("hidden", view !== "tracker");
+  $("#pageTitle").classList.toggle("hidden", view !== "home");
+  updateAddBtnVisibility();
   document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.nav === view);
   });
