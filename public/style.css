@@ -342,13 +342,27 @@ button svg { vertical-align: middle; }
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
   border-radius: 30px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   padding: 8px 12px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.4);
   position: relative;
 }
+
+/* Equal 1fr tracks flanking the fixed-width FAB column keep the "+" button
+   exactly centered regardless of how much content sits on either side. */
+.nav-group-left {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+/* Compact padding/gap so Home+Tracker fit their half of the bar without
+   overflowing into the FAB's column - the FAB's column is fixed-width so
+   this side has less room than a lone nav-item like Settings gets. */
+.nav-group-left .nav-item { padding: 8px 2px; gap: 3px; }
+.nav-group-left .nav-label { font-size: 0.72rem; }
 
 .nav-item {
   background: none;
@@ -366,7 +380,13 @@ button svg { vertical-align: middle; }
 .nav-icon { line-height: 1; display: flex; }
 .nav-label { font-size: 0.78rem; font-weight: 600; }
 
+#navRightBtn {
+  grid-column: 3;
+  justify-self: end;
+}
+
 .nav-fab-slot {
+  grid-column: 2;
   width: 56px;
   display: flex;
   justify-content: center;
