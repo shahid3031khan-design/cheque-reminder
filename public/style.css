@@ -1,66 +1,41 @@
 :root {
-  --bg: #f5f3ec;
-  --panel: #ffffff;
-  --text: #16302b;
-  --text-muted: #7c8f89;
-  --border: #e7e3d8;
+  /* Fixed dark theme - the reference design is dark-only, not adaptive. */
+  --bg: #141414;
+  --panel: #1f1f1f;
+  --text: #ffffff;
+  --text-muted: #9a9a9a;
+  --border: #2e2e2e;
 
-  --green: #2f8f7a;
-  --green-dark: #1f6b5a;
-  --green-soft: #e3f3ef;
-  --green-deep: #16302b; /* darkest tier of the brand ramp - reserved for overdue, the most severe cheque status */
-  --green-deep-soft: #dce8e4;
-  --chrome: #16302b; /* fixed deep-teal chrome (nav bar, active tab) - stays dark in both themes */
-  --chrome-text: #f5f3ec; /* fixed light text/icon color for content sitting on --chrome */
+  --yellow: #f2e94e; /* brand accent - active tabs, primary buttons, FAB, selected states */
+  --yellow-dark: #d9cc33;
+  --yellow-soft: #3a3620;
+  --yellow-text: #141414; /* dark text/icon color for content sitting on --yellow */
 
-  /* --red is repurposed as the reference's coral accent - kept only for system-level
-     conventions (errors, destructive delete actions), not cheque due-date status. */
-  --red: #e8604c;
-  --red-soft: #fbe0da;
-  --gray-soft: #efede4;
+  /* Deposited-cheque status keeps a dedicated success green, distinct from brand yellow. */
+  --success: #4caf6d;
+  --success-soft: #1f3326;
+
+  --red: #ff6b5b;
+  --red-soft: #3d2620;
+  --gray-soft: #262626;
 
   /* Category icon-badge tints, used on the four stat cards (calendar/calendar/warning/document) */
   --icon-mint: #2f9e7b;
-  --icon-mint-bg: #dff5ec;
-  --icon-blue: #3b82c4;
-  --icon-blue-bg: #e1eefc;
-  --icon-purple: #8b5fc4;
-  --icon-purple-bg: #ede3fb;
+  --icon-mint-bg: #1c3b33;
+  --icon-blue: #5fa8e8;
+  --icon-blue-bg: #1c2f42;
+  --icon-purple: #b48ef0;
+  --icon-purple-bg: #2c2140;
 
-  /* Light glass system - white/translucent cards with blur, used for the bottom nav,
-     stat cards, and cheque cards, matching the reference's frosted-glass look. */
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-card-bg: rgba(255, 255, 255, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.6);
-  --glass-blur: 18px;
+  /* Flat solid dark surfaces (no blur) for the topbar/bottom-nav/cards/modals -
+     variable names kept as "glass-*" since many rules still reference them. */
+  --glass-bg: #1a1a1a;
+  --glass-card-bg: #1f1f1f;
+  --glass-border: #2e2e2e;
+  --glass-blur: 0px;
 
-  --shadow: 0 8px 24px rgba(22, 48, 43, 0.1);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   --radius: 18px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e211d;
-    --panel: #16302b;
-    --text: #f1efe6;
-    --text-muted: #9bafa9;
-    --border: #24463d;
-
-    --red-soft: #3d2620;
-    --green-soft: #1c3b33;
-    --green-deep-soft: #1a342d;
-    --gray-soft: #223b35;
-
-    --icon-mint-bg: #1c3b33;
-    --icon-blue-bg: #1c2f42;
-    --icon-purple-bg: #2c2140;
-
-    --glass-bg: rgba(10, 26, 22, 0.55);
-    --glass-card-bg: rgba(22, 48, 43, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.08);
-
-    --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  }
 }
 
 * { box-sizing: border-box; }
@@ -95,7 +70,7 @@ body {
   margin: 0 0 2px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--green-dark);
+  color: var(--yellow-dark);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -131,7 +106,7 @@ body {
 .remove-row-btn svg { width: 15px; height: 15px; }
 .user-row-actions button svg { width: 13px; height: 13px; }
 button svg { vertical-align: middle; }
-.icon-btn:hover { color: var(--green-dark); }
+.icon-btn:hover { color: var(--yellow-dark); }
 
 /* ---------- Stats ---------- */
 
@@ -217,9 +192,9 @@ button svg { vertical-align: middle; }
   flex-shrink: 0;
 }
 .tab.active {
-  background: var(--chrome);
-  border-color: var(--chrome);
-  color: var(--chrome-text);
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--yellow-text);
 }
 
 .empty-state {
@@ -251,14 +226,14 @@ button svg { vertical-align: middle; }
   overflow: hidden;
 }
 .card-body { cursor: pointer; }
-.card-body:hover .card-title { color: var(--green-dark); }
+.card-body:hover .card-title { color: var(--yellow-dark); }
 
 .card-stripe { width: 5px; flex-shrink: 0; }
 .card-stripe.status-overdue { background: var(--red); }
-.card-stripe.status-urgent { background: var(--green-dark); }
-.card-stripe.status-soon { background: var(--green); }
+.card-stripe.status-urgent { background: var(--yellow-dark); }
+.card-stripe.status-soon { background: var(--yellow); }
 .card-stripe.status-later { background: var(--border); }
-.card-stripe.status-deposited { background: var(--green); }
+.card-stripe.status-deposited { background: var(--success); }
 .card-stripe.status-bounced { background: var(--red); }
 
 .card-body {
@@ -326,7 +301,7 @@ button svg { vertical-align: middle; }
 }
 .card-actions button:last-child { border-bottom: none; }
 .card-actions button:hover { color: var(--text); background: var(--gray-soft); }
-.card-actions button.action-deposit:hover { color: var(--green); }
+.card-actions button.action-deposit:hover { color: var(--success); }
 .card-actions button.action-delete:hover { color: var(--red); }
 
 /* ---------- Badges ---------- */
@@ -340,10 +315,10 @@ button svg { vertical-align: middle; }
   white-space: nowrap;
 }
 .badge.overdue { background: var(--red-soft); color: var(--red); }
-.badge.urgent { background: var(--green-soft); color: var(--green-dark); }
-.badge.soon { background: var(--green-soft); color: var(--green); }
+.badge.urgent { background: var(--yellow-soft); color: var(--yellow-dark); }
+.badge.soon { background: var(--yellow-soft); color: var(--yellow); }
 .badge.later { background: var(--gray-soft); color: var(--text-muted); }
-.badge.ok { background: var(--green-soft); color: var(--green); }
+.badge.ok { background: var(--success-soft); color: var(--success); }
 
 /* ---------- Bottom nav ---------- */
 
@@ -371,7 +346,7 @@ button svg { vertical-align: middle; }
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  box-shadow: 0 12px 30px rgba(22,48,43,0.18);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
   position: relative;
 }
 
@@ -387,7 +362,7 @@ button svg { vertical-align: middle; }
   padding: 8px 14px;
   border-radius: 20px;
 }
-.nav-item.active { color: var(--green-dark); background: var(--glass-card-bg); }
+.nav-item.active { color: var(--yellow-dark); background: var(--glass-card-bg); }
 .nav-icon { line-height: 1; display: flex; }
 .nav-label { font-size: 0.78rem; font-weight: 600; }
 
@@ -400,23 +375,23 @@ button svg { vertical-align: middle; }
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--green);
-  color: #04231a;
+  background: var(--yellow);
+  color: var(--yellow-text);
   border: 4px solid var(--bg);
   font-size: 1.6rem;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(31, 184, 116, 0.5);
+  box-shadow: 0 8px 18px rgba(242, 233, 78, 0.35);
   margin-top: -34px;
 }
-.nav-fab:hover { background: var(--green-dark); }
+.nav-fab:hover { background: var(--yellow-dark); }
 
 /* ---------- Sheets / modals ---------- */
 
 .sheet-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(14, 33, 29, 0.45);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
@@ -484,7 +459,7 @@ input {
 }
 input:focus {
   outline: none;
-  border-color: var(--green);
+  border-color: var(--yellow);
 }
 
 .form-row {
@@ -500,8 +475,8 @@ input:focus {
 }
 
 button.primary {
-  background: var(--green);
-  color: #04231a;
+  background: var(--yellow);
+  color: var(--yellow-text);
   border: none;
   padding: 12px 18px;
   border-radius: 14px;
@@ -510,7 +485,7 @@ button.primary {
   font-weight: 700;
   flex: 1;
 }
-button.primary:hover { background: var(--green-dark); }
+button.primary:hover { background: var(--yellow-dark); }
 
 button.secondary {
   background: transparent;
@@ -571,7 +546,7 @@ select {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--green-soft) 0%, var(--bg) 55%);
+  background: linear-gradient(180deg, var(--yellow-soft) 0%, var(--bg) 55%);
 }
 
 .login-illustration {
@@ -581,7 +556,7 @@ select {
   padding: 32px;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 32% 30%, var(--green-soft) 0%, var(--bg) 65%);
+  background: radial-gradient(circle at 32% 30%, var(--yellow-soft) 0%, var(--bg) 65%);
 }
 .login-illustration svg { width: 78%; max-width: 380px; height: auto; }
 
@@ -614,16 +589,16 @@ select {
   height: 64px;
   margin: 0 auto 10px;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.55), var(--green-soft) 45%, var(--green) 100%);
+  background: radial-gradient(circle at 32% 28%, #fbf7c9 0%, var(--yellow) 60%, var(--yellow-dark) 100%);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--glass-border);
-  box-shadow: inset 0 2px 6px rgba(255,255,255,0.4), 0 6px 16px rgba(22,48,43,0.18);
+  box-shadow: inset 0 2px 6px rgba(255,255,255,0.4), 0 6px 16px rgba(0,0,0,0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.8rem;
-  color: var(--green-dark);
+  color: var(--yellow-text);
 }
 
 .login-title {
@@ -641,7 +616,7 @@ select {
   margin-bottom: 14px;
   font-size: 0.82rem;
 }
-.login-row a { color: var(--green-dark); text-decoration: none; font-weight: 600; }
+.login-row a { color: var(--yellow-dark); text-decoration: none; font-weight: 600; }
 .checkbox-label {
   display: flex;
   flex-direction: row;
@@ -688,7 +663,7 @@ select {
   white-space: nowrap;
 }
 .user-badge svg { width: 14px; height: 14px; flex-shrink: 0; }
-.user-badge .role-admin { color: var(--green-dark); }
+.user-badge .role-admin { color: var(--yellow-dark); }
 .user-badge .role-employee { color: var(--text-muted); }
 
 /* ---------- Installment rows (multi-cheque add) ---------- */
@@ -779,10 +754,10 @@ select {
 }
 .deal-stat-chip .chip-num { display: block; font-size: 1.15rem; font-weight: 800; }
 .deal-stat-chip .chip-label { display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
-.deal-stat-chip.chip-deposited { background: var(--green-soft); }
-.deal-stat-chip.chip-deposited .chip-num { color: var(--green); }
-.deal-stat-chip.chip-pending { background: var(--green-soft); }
-.deal-stat-chip.chip-pending .chip-num { color: var(--green-dark); }
+.deal-stat-chip.chip-deposited { background: var(--success-soft); }
+.deal-stat-chip.chip-deposited .chip-num { color: var(--success); }
+.deal-stat-chip.chip-pending { background: var(--yellow-soft); }
+.deal-stat-chip.chip-pending .chip-num { color: var(--yellow-dark); }
 .deal-stat-chip.chip-overdue { background: var(--red-soft); }
 .deal-stat-chip.chip-overdue .chip-num { color: var(--red); }
 
@@ -817,7 +792,7 @@ select {
   font-size: 0.85rem;
 }
 .deal-cheque-row-actions button:hover { color: var(--text); }
-.deal-cheque-row-actions button.action-deposit:hover { color: var(--green); border-color: var(--green); }
+.deal-cheque-row-actions button.action-deposit:hover { color: var(--success); border-color: var(--success); }
 .deal-cheque-row-actions button.action-delete:hover { color: var(--red); border-color: var(--red); }
 
 /* ---------- Manage users ---------- */
@@ -854,7 +829,7 @@ select {
   border-radius: 10px;
   margin-left: 6px;
 }
-.user-row-role.admin { background: var(--green-soft); color: var(--green-dark); }
+.user-row-role.admin { background: var(--yellow-soft); color: var(--yellow-dark); }
 .user-row-role.employee { background: var(--gray-soft); color: var(--text-muted); }
 .user-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .user-row-actions button {
@@ -934,8 +909,7 @@ select {
   justify-content: center;
 }
 .tracker-cal-day.other-month { visibility: hidden; pointer-events: none; }
-.tracker-cal-day.is-today { color: var(--green-dark); font-weight: 800; }
-.tracker-cal-day.is-selected { background: var(--chrome); color: var(--chrome-text); }
+.tracker-cal-day.is-today { box-shadow: inset 0 0 0 2px var(--yellow-dark); font-weight: 800; }
 .tracker-cal-day .entry-dot {
   position: absolute;
   bottom: 3px;
@@ -944,12 +918,20 @@ select {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--green);
+  background: var(--yellow);
 }
-.tracker-cal-day.is-selected .entry-dot { background: var(--chrome-text); }
-.tracker-cal-day.rating-1 .entry-dot,
-.tracker-cal-day.rating-2 .entry-dot { background: var(--red); }
-.tracker-cal-day.rating-3 .entry-dot { background: #d98a00; }
+
+/* Rating intensity ramp - fills the whole day circle, dull green (1) to bright green (5),
+   so the admin can gauge an employee's ratings across the month at a glance. */
+.tracker-cal-day.rating-1 { background: hsl(140, 30%, 20%); color: #ffffff; }
+.tracker-cal-day.rating-2 { background: hsl(140, 35%, 30%); color: #ffffff; }
+.tracker-cal-day.rating-3 { background: hsl(140, 42%, 40%); color: #ffffff; }
+.tracker-cal-day.rating-4 { background: hsl(140, 50%, 48%); color: #0e1a12; }
+.tracker-cal-day.rating-5 { background: hsl(140, 60%, 56%); color: #0e1a12; }
+.tracker-cal-day[class*="rating-"] .entry-dot { display: none; }
+
+.tracker-cal-day.is-selected { background: var(--yellow); color: var(--yellow-text); }
+.tracker-cal-day.is-selected .entry-dot { background: var(--yellow-text); }
 
 .tracker-day-panel {
   background: var(--glass-card-bg);
@@ -980,8 +962,8 @@ select {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--green-dark);
-  background: var(--green-soft);
+  color: var(--yellow-dark);
+  background: var(--yellow-soft);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -998,7 +980,7 @@ select {
   resize: vertical;
   margin-bottom: 10px;
 }
-.tracker-section textarea:focus { outline: none; border-color: var(--green); }
+.tracker-section textarea:focus { outline: none; border-color: var(--yellow); }
 .tracker-section textarea:disabled { opacity: 0.65; resize: none; }
 
 .tracker-rating {
@@ -1014,7 +996,7 @@ select {
   color: var(--border);
 }
 .tracker-star svg { width: 26px; height: 26px; }
-.tracker-star.active { color: var(--green); }
+.tracker-star.active { color: var(--yellow); }
 .tracker-star:disabled { cursor: not-allowed; }
 
 .tracker-section button.full-width { margin-top: 2px; }
