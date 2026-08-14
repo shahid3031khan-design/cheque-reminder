@@ -1,41 +1,50 @@
 :root {
-  /* Fixed dark theme - the reference design is dark-only, not adaptive. */
-  --bg: #141414;
-  --panel: #1f1f1f;
-  --text: #ffffff;
-  --text-muted: #9a9a9a;
-  --border: #2e2e2e;
+  /* Light glass theme - soft peach-to-lavender gradient with frosted white cards. */
+  --bg-gradient: linear-gradient(135deg, #f7cbae 0%, #ecb9cd 45%, #c8b3e8 100%);
+  --bg: #eec9cf; /* flat fallback for surfaces that can't show the gradient */
+  --panel: #ffffff;
+  --text: #1c1c1e;
+  --text-muted: #8b8b93;
+  --border: rgba(28, 28, 30, 0.08);
 
-  --yellow: #f2e94e; /* brand accent - active tabs, primary buttons, FAB, selected states */
-  --yellow-dark: #d9cc33;
-  --yellow-soft: #3a3620;
-  --yellow-text: #141414; /* dark text/icon color for content sitting on --yellow */
+  --yellow: #1c1c1e; /* brand/primary action = near-black, matches the reference's black buttons/pills */
+  --yellow-dark: #000000;
+  --yellow-soft: #efeff1;
+  --yellow-text: #ffffff; /* text/icon color for content sitting on --yellow */
 
-  /* Deposited-cheque status keeps a dedicated success green, distinct from brand yellow. */
-  --success: #4caf6d;
-  --success-soft: #1f3326;
+  /* Medium-severity warm accent (urgent/soon cheques, pending stats) - kept distinct
+     from brand black so cheque status stays readable at a glance. */
+  --warning: #e8a33d;
+  --warning-dark: #c97f1f;
+  --warning-soft: #fbe7cf;
 
-  --red: #ff6b5b;
-  --red-soft: #3d2620;
-  --gray-soft: #262626;
+  /* Deposited-cheque status keeps a dedicated success green. */
+  --success: #4caf50;
+  --success-soft: #ddf3dc;
+
+  --red: #e8536e;
+  --red-soft: #fbdce2;
+  --gray-soft: #eeeeee;
+
+  /* Warm gold for the tracker's 1-5 rating stars, distinct from brand black. */
+  --star: #f2b544;
 
   /* Category icon-badge tints, used on the four stat cards (calendar/calendar/warning/document) */
-  --icon-mint: #2f9e7b;
-  --icon-mint-bg: #1c3b33;
-  --icon-blue: #5fa8e8;
-  --icon-blue-bg: #1c2f42;
-  --icon-purple: #b48ef0;
-  --icon-purple-bg: #2c2140;
+  --icon-mint: #4caf50;
+  --icon-mint-bg: #ddf3dc;
+  --icon-blue: #4a90d9;
+  --icon-blue-bg: #dceafb;
+  --icon-purple: #9c6ade;
+  --icon-purple-bg: #ede0fa;
 
-  /* Flat solid dark surfaces (no blur) for the topbar/bottom-nav/cards/modals -
-     variable names kept as "glass-*" since many rules still reference them. */
-  --glass-bg: #1a1a1a;
-  --glass-card-bg: #1f1f1f;
-  --glass-border: #2e2e2e;
-  --glass-blur: 0px;
+  /* Frosted-glass surfaces (blurred translucent white) for the topbar/bottom-nav/cards/modals. */
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-card-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-blur: 20px;
 
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --radius: 18px;
+  --shadow: 0 10px 28px rgba(120, 70, 100, 0.16);
+  --radius: 22px;
 }
 
 * { box-sizing: border-box; }
@@ -43,7 +52,8 @@
 body {
   margin: 0;
   font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  background: var(--bg);
+  background: var(--bg-gradient);
+  min-height: 100vh;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
@@ -230,8 +240,8 @@ button svg { vertical-align: middle; }
 
 .card-stripe { width: 5px; flex-shrink: 0; }
 .card-stripe.status-overdue { background: var(--red); }
-.card-stripe.status-urgent { background: var(--yellow-dark); }
-.card-stripe.status-soon { background: var(--yellow); }
+.card-stripe.status-urgent { background: var(--warning-dark); }
+.card-stripe.status-soon { background: var(--warning); }
 .card-stripe.status-later { background: var(--border); }
 .card-stripe.status-deposited { background: var(--success); }
 .card-stripe.status-bounced { background: var(--red); }
@@ -315,8 +325,8 @@ button svg { vertical-align: middle; }
   white-space: nowrap;
 }
 .badge.overdue { background: var(--red-soft); color: var(--red); }
-.badge.urgent { background: var(--yellow-soft); color: var(--yellow-dark); }
-.badge.soon { background: var(--yellow-soft); color: var(--yellow); }
+.badge.urgent { background: var(--warning-soft); color: var(--warning-dark); }
+.badge.soon { background: var(--warning-soft); color: var(--warning); }
 .badge.later { background: var(--gray-soft); color: var(--text-muted); }
 .badge.ok { background: var(--success-soft); color: var(--success); }
 
@@ -362,9 +372,22 @@ button svg { vertical-align: middle; }
   padding: 8px 14px;
   border-radius: 20px;
 }
-.nav-item.active { color: var(--yellow-dark); background: var(--glass-card-bg); }
+.nav-item.active { color: var(--yellow-text); background: var(--yellow); }
 .nav-icon { line-height: 1; display: flex; }
 .nav-label { font-size: 0.78rem; font-weight: 600; }
+
+/* Small build-version watermark, bottom-left, purely informational -
+   bump the number in index.html whenever a notable change ships. */
+.app-version {
+  position: fixed;
+  left: 10px;
+  bottom: calc(6px + env(safe-area-inset-bottom));
+  z-index: 30;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(28, 28, 30, 0.35);
+  pointer-events: none;
+}
 
 /* Floating "Add Cheques" pill - sits above the bottom nav, flush right,
    shown only on the Home/Cheques layout (toggled in app.js). */
@@ -384,7 +407,7 @@ button svg { vertical-align: middle; }
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(242, 233, 78, 0.35);
+  box-shadow: 0 8px 18px rgba(28, 28, 30, 0.35);
 }
 .fab-pill:hover { background: var(--yellow-dark); }
 .fab-pill-icon {
@@ -469,7 +492,7 @@ input {
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--panel);
   color: var(--text);
 }
 input:focus {
@@ -547,7 +570,7 @@ select {
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--panel);
   color: var(--text);
 }
 
@@ -561,7 +584,7 @@ select {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--yellow-soft) 0%, var(--bg) 55%);
+  background: var(--bg-gradient);
 }
 
 .login-illustration {
@@ -571,7 +594,6 @@ select {
   padding: 32px;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 32% 30%, var(--yellow-soft) 0%, var(--bg) 65%);
 }
 .login-illustration svg { width: 78%; max-width: 380px; height: auto; }
 
@@ -604,7 +626,7 @@ select {
   height: 64px;
   margin: 0 auto 10px;
   border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, #fbf7c9 0%, var(--yellow) 60%, var(--yellow-dark) 100%);
+  background: radial-gradient(circle at 32% 28%, #4a4a4c 0%, var(--yellow) 60%, var(--yellow-dark) 100%);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--glass-border);
@@ -708,7 +730,7 @@ select {
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--bg);
+  background: var(--panel);
 }
 .installment-row label { margin-bottom: 0; min-width: 0; }
 .installment-row input { min-width: 0; width: 100%; }
@@ -771,8 +793,8 @@ select {
 .deal-stat-chip .chip-label { display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
 .deal-stat-chip.chip-deposited { background: var(--success-soft); }
 .deal-stat-chip.chip-deposited .chip-num { color: var(--success); }
-.deal-stat-chip.chip-pending { background: var(--yellow-soft); }
-.deal-stat-chip.chip-pending .chip-num { color: var(--yellow-dark); }
+.deal-stat-chip.chip-pending { background: var(--warning-soft); }
+.deal-stat-chip.chip-pending .chip-num { color: var(--warning-dark); }
 .deal-stat-chip.chip-overdue { background: var(--red-soft); }
 .deal-stat-chip.chip-overdue .chip-num { color: var(--red); }
 
@@ -990,7 +1012,7 @@ select {
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--panel);
   color: var(--text);
   resize: vertical;
   margin-bottom: 10px;
@@ -1011,7 +1033,7 @@ select {
   color: var(--border);
 }
 .tracker-star svg { width: 26px; height: 26px; }
-.tracker-star.active { color: var(--yellow); }
+.tracker-star.active { color: var(--star); }
 .tracker-star:disabled { cursor: not-allowed; }
 
 .tracker-section button.full-width { margin-top: 2px; }
