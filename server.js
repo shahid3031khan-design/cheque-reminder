@@ -259,6 +259,74 @@ app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
   res.json(entry);
 });
 
+// ---------- Tasks (admin assigns work to one or more employees) ----------
+
+const PRIORITIES = ["low", "medium", "high"];
+const TASK_STATUSES = ["pending", "in_progress", "done"];
+
+app.get("/api/tasks", auth.requireAuth, async (req, res) => {
+  if (req.user.role === "admin") {
+    res.json(await db.getTasks());
+  } else {
+    res.json(await db.getTasksForUser(req.user.userId));
+  }
+});
+
+app.post("/api/tasks", auth.requireAdmin, async (req, res) => {
+  const b = req.body;
+  const title = String(b.title || "").trim();
+  if (!title) return res.status(400).json({ error: "Task title is required" });
+  const assignedTo = Array.isArray(b.assignedTo) ? b.assignedTo.filter(Boolean) : [];
+  if (assignedTo.length === 0) return res.status(400).json({ error: "Assign the task to at least one employee" });
+  const priority = PRIORITIES.includes(b.priority) ? b.priority : "medium";
+  const task = {
+    id: db.newId("t"),
+    title,
+    description: String(b.description || "").slice(0, 5000),
+    priority,
+    assignedTo,
+    assignedBy: req.user.userId,
+    dueDate: b.dueDate || null,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  await db.createTask(task);
+  res.status(201).json(task);
+});
+
+app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
+  const task = await db.findTaskById(req.params.id);
+  if (!task) return res.status(404).json({ error: "Task not found" });
+
+  if (req.user.role === "admin") {
+    const fields = {};
+    if (req.body.title !== undefined) fields.title = String(req.body.title).trim();
+    if (req.body.description !== undefined) fields.description = String(req.body.description).slice(0, 5000);
+    if (req.body.priority !== undefined && PRIORITIES.includes(req.body.priority)) fields.priority = req.body.priority;
+    if (req.body.assignedTo !== undefined) {
+      const assignedTo = Array.isArray(req.body.assignedTo) ? req.body.assignedTo.filter(Boolean) : [];
+      if (assignedTo.length === 0) return res.status(400).json({ error: "Assign the task to at least one employee" });
+      fields.assignedTo = assignedTo;
+    }
+    if (req.body.dueDate !== undefined) fields.dueDate = req.body.dueDate;
+    if (req.body.status !== undefined) {
+      if (!TASK_STATUSES.includes(req.body.status)) return res.status(400).json({ error: "Invalid status" });
+      fields.status = req.body.status;
+    }
+    return res.json(await db.updateTask(task.id, fields));
+  }
+
+  // Employees may only update the status of a task assigned to them.
+  if (!task.assignedTo.includes(req.user.userId)) return res.status(403).json({ error: "Not your task" });
+  if (!TASK_STATUSES.includes(req.body.status)) return res.status(400).json({ error: "Invalid status" });
+  res.json(await db.updateTask(task.id, { status: req.body.status }));
+});
+
+app.delete("/api/tasks/:id", auth.requireAdmin, async (req, res) => {
+  await db.deleteTask(req.params.id);
+  res.json({ ok: true });
+});
+
 // ---------- Boot ----------
 
 async function start() {

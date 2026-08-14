@@ -16,6 +16,10 @@ const state = {
   trackerCurrentEntry: null,
   trackerEmployeesLoaded: false,
   trackerPendingRating: null,
+  tasks: [],
+  taskEmployees: [],
+  taskEmployeesLoaded: false,
+  taskPriority: "medium",
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -108,8 +112,14 @@ function showApp() {
 }
 
 function updateAddBtnVisibility() {
-  const show = isAdmin() && state.currentView === "home";
-  $("#addBtn").classList.toggle("hidden", !show);
+  const view = state.currentView;
+  const show = isAdmin() && (view === "home" || view === "tasks");
+  const btn = $("#addBtn");
+  btn.classList.toggle("hidden", !show);
+  const text = view === "tasks" ? "Add Task" : "Add Cheques";
+  const label = $("#addBtn .fab-pill-label");
+  if (label) label.textContent = text;
+  btn.setAttribute("aria-label", text);
 }
 
 function applyRoleUI() {
@@ -126,12 +136,14 @@ function switchView(view) {
   state.currentView = view;
   $("#homeView").classList.toggle("hidden", view !== "home");
   $("#trackerView").classList.toggle("hidden", view !== "tracker");
+  $("#tasksView").classList.toggle("hidden", view !== "tasks");
   $("#pageTitle").classList.toggle("hidden", view !== "home");
   updateAddBtnVisibility();
   document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.nav === view);
   });
   if (view === "tracker") openTrackerView();
+  if (view === "tasks") openTasksView();
 }
 
 document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
@@ -498,7 +510,10 @@ function closeChequeFormModal() {
   state.editingDealKey = null;
 }
 
-$("#addBtn").addEventListener("click", openAddModal);
+$("#addBtn").addEventListener("click", () => {
+  if (state.currentView === "tasks") openAddTaskModal();
+  else openAddModal();
+});
 $("#closeAddBtn").addEventListener("click", closeChequeFormModal);
 $("#cancelChequeFormBtn").addEventListener("click", closeChequeFormModal);
 $("#addModal").addEventListener("click", (e) => { if (e.target.id === "addModal") closeChequeFormModal(); });
@@ -695,6 +710,151 @@ $("#trackerSaveRemarksBtn").addEventListener("click", async () => {
     $("#trackerRemarksStatus").textContent = err.message;
   }
   setTimeout(() => { $("#trackerRemarksStatus").textContent = ""; }, 2000);
+});
+
+// ---------- Tasks (admin assigns work to employees) ----------
+
+async function openTasksView() {
+  if (isAdmin() && !state.taskEmployeesLoaded) {
+    await loadTaskEmployees();
+  }
+  await loadTasks();
+  renderTasksList();
+}
+
+async function loadTaskEmployees() {
+  state.taskEmployees = await api("/api/users");
+  state.taskEmployeesLoaded = true;
+}
+
+async function loadTasks() {
+  state.tasks = await api("/api/tasks");
+}
+
+function priorityLabel(p) { return p === "high" ? "High" : p === "low" ? "Low" : "Medium"; }
+
+function renderTasksList() {
+  const admin = isAdmin();
+  const container = $("#tasksList");
+  const empty = $("#tasksEmptyState");
+  const tasks = [...state.tasks].sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+  if (tasks.length === 0) {
+    container.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  container.innerHTML = tasks.map((t) => {
+    const assigneeNames = admin
+      ? t.assignedTo.map((id) => {
+          const u = state.taskEmployees.find((e) => e.id === id);
+          return escapeHtml(u ? (u.displayName || u.username) : "Unknown");
+        }).join(", ")
+      : "";
+    const due = t.dueDate ? new Date(t.dueDate + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+    return `
+      <div class="task-card" data-id="${t.id}">
+        <div class="task-card-top">
+          <span class="badge priority-${t.priority}">${priorityLabel(t.priority)}</span>
+          ${due ? `<span class="task-due">${due}</span>` : ""}
+        </div>
+        <h3 class="task-title">${escapeHtml(t.title)}</h3>
+        ${t.description ? `<p class="task-desc">${escapeHtml(t.description)}</p>` : ""}
+        ${admin ? `<p class="task-assignees">${assigneeNames}</p>` : ""}
+        <div class="task-status-row">
+          <button type="button" class="task-status-btn ${t.status === "pending" ? "active" : ""}" data-status="pending">To Do</button>
+          <button type="button" class="task-status-btn ${t.status === "in_progress" ? "active" : ""}" data-status="in_progress">In Progress</button>
+          <button type="button" class="task-status-btn ${t.status === "done" ? "active" : ""}" data-status="done">Done</button>
+        </div>
+        ${admin ? `<button type="button" class="task-delete-btn" data-id="${t.id}">Delete task</button>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+$("#tasksList").addEventListener("click", async (e) => {
+  const statusBtn = e.target.closest(".task-status-btn");
+  if (statusBtn) {
+    const id = statusBtn.closest(".task-card").dataset.id;
+    await api(`/api/tasks/${id}`, { method: "PUT", body: JSON.stringify({ status: statusBtn.dataset.status }) });
+    await loadTasks();
+    renderTasksList();
+    return;
+  }
+  const delBtn = e.target.closest(".task-delete-btn");
+  if (delBtn) {
+    if (!confirm("Delete this task?")) return;
+    await api(`/api/tasks/${delBtn.dataset.id}`, { method: "DELETE" });
+    await loadTasks();
+    renderTasksList();
+  }
+});
+
+function renderTaskAssigneeOptions() {
+  const container = $("#taskAssigneeSelect");
+  container.innerHTML = state.taskEmployees
+    .filter((u) => u.role === "employee")
+    .map((u) => `
+      <label class="assignee-chip">
+        <input type="checkbox" value="${u.id}">
+        <span>${escapeHtml(u.displayName || u.username)}</span>
+      </label>
+    `).join("");
+}
+
+function openAddTaskModal() {
+  $("#addTaskForm").reset();
+  state.taskPriority = "medium";
+  document.querySelectorAll("#taskPrioritySelect .priority-pill").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.priority === "medium");
+  });
+  renderTaskAssigneeOptions();
+  $("#addTaskStatus").classList.add("hidden");
+  $("#addTaskModal").classList.remove("hidden");
+}
+
+function closeAddTaskModal() {
+  $("#addTaskModal").classList.add("hidden");
+}
+
+$("#taskPrioritySelect").addEventListener("click", (e) => {
+  const btn = e.target.closest(".priority-pill");
+  if (!btn) return;
+  state.taskPriority = btn.dataset.priority;
+  document.querySelectorAll("#taskPrioritySelect .priority-pill").forEach((b) => b.classList.toggle("active", b === btn));
+});
+
+$("#closeAddTaskBtn").addEventListener("click", closeAddTaskModal);
+$("#cancelAddTaskBtn").addEventListener("click", closeAddTaskModal);
+$("#addTaskModal").addEventListener("click", (e) => { if (e.target.id === "addTaskModal") closeAddTaskModal(); });
+
+$("#addTaskForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const assignedTo = Array.from(document.querySelectorAll("#taskAssigneeSelect input:checked")).map((i) => i.value);
+  $("#addTaskStatus").classList.add("hidden");
+  if (assignedTo.length === 0) {
+    $("#addTaskStatus").textContent = "Select at least one employee to assign this task to.";
+    $("#addTaskStatus").classList.remove("hidden");
+    return;
+  }
+  try {
+    await api("/api/tasks", {
+      method: "POST",
+      body: JSON.stringify({
+        title: $("#taskTitle").value.trim(),
+        description: $("#taskDescription").value.trim(),
+        dueDate: $("#taskDueDate").value || null,
+        priority: state.taskPriority,
+        assignedTo,
+      }),
+    });
+    closeAddTaskModal();
+    await loadTasks();
+    renderTasksList();
+  } catch (err) {
+    $("#addTaskStatus").textContent = err.message || "Failed to create task.";
+    $("#addTaskStatus").classList.remove("hidden");
+  }
 });
 
 // ---------- Settings ----------

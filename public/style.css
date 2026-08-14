@@ -329,6 +329,9 @@ button svg { vertical-align: middle; }
 .badge.soon { background: var(--warning-soft); color: var(--warning); }
 .badge.later { background: var(--gray-soft); color: var(--text-muted); }
 .badge.ok { background: var(--success-soft); color: var(--success); }
+.badge.priority-low { background: var(--success-soft); color: var(--success); }
+.badge.priority-medium { background: var(--warning-soft); color: var(--warning-dark); }
+.badge.priority-high { background: var(--red-soft); color: var(--red); }
 
 /* ---------- Bottom nav ---------- */
 
@@ -367,14 +370,16 @@ button svg { vertical-align: middle; }
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  padding: 8px 14px;
+  padding: 8px 9px;
   border-radius: 20px;
+  white-space: nowrap;
 }
 .nav-item.active { color: var(--yellow-text); background: var(--yellow); }
 .nav-icon { line-height: 1; display: flex; }
-.nav-label { font-size: 0.78rem; font-weight: 600; }
+.nav-icon svg { width: 18px; height: 18px; }
+.nav-label { font-size: 0.72rem; font-weight: 600; }
 
 /* Small build-version watermark, bottom-left, purely informational -
    bump the number in index.html whenever a notable change ships. */
@@ -1037,3 +1042,109 @@ select {
 .tracker-star:disabled { cursor: not-allowed; }
 
 .tracker-section button.full-width { margin-top: 2px; }
+
+/* ---------- Tasks ---------- */
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-card {
+  background: var(--glass-card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+}
+
+.task-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.task-due { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+
+.task-title { margin: 0 0 4px; font-size: 0.98rem; font-weight: 800; }
+.task-desc { margin: 0 0 8px; font-size: 0.82rem; color: var(--text-muted); }
+.task-assignees { margin: 0 0 10px; font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+
+.task-status-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.task-status-btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.task-status-btn.active { background: var(--yellow); border-color: var(--yellow); color: var(--yellow-text); }
+
+.task-delete-btn {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Priority pill selector inside the Add Task form - an outlined toggle group,
+   filled solid when selected, colors reused from the badge severity system. */
+.priority-select {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.priority-pill {
+  flex: 1;
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  padding: 8px 0;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.priority-pill.low { border-color: var(--success); color: var(--success); }
+.priority-pill.medium { border-color: var(--warning); color: var(--warning-dark); }
+.priority-pill.high { border-color: var(--red); color: var(--red); }
+.priority-pill.low.active { background: var(--success); border-color: var(--success); color: #fff; }
+.priority-pill.medium.active { background: var(--warning); border-color: var(--warning); color: #fff; }
+.priority-pill.high.active { background: var(--red); border-color: var(--red); color: #fff; }
+
+.assignee-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.assignee-chip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  margin-bottom: 0;
+}
+.assignee-chip input { width: auto; padding: 0; accent-color: var(--yellow); }
