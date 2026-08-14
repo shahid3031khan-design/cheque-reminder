@@ -83,6 +83,7 @@
     </div>
   </header>
 
+  <div id="homeView">
   <section class="stats" id="stats">
     <div class="stat-card stat-urgent">
       <span class="stat-icon-badge badge-mint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3.5" y1="10" x2="20.5" y2="10"/></svg></span>
@@ -123,6 +124,46 @@
     </div>
     <div id="chequeList" class="cheque-cards"></div>
   </section>
+  </div>
+
+  <div id="trackerView" class="hidden">
+    <div class="tracker-header">
+      <h2>Tracker</h2>
+      <select id="trackerEmployeeSelect" class="hidden"></select>
+    </div>
+
+    <div class="tracker-cal-card">
+      <div class="tracker-cal-nav">
+        <button type="button" id="trackerPrevMonth" class="icon-btn" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg></button>
+        <span id="trackerMonthLabel">Month Year</span>
+        <button type="button" id="trackerNextMonth" class="icon-btn" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+      </div>
+      <div class="tracker-cal-weekdays">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+      <div class="tracker-cal-grid" id="trackerCalGrid"></div>
+    </div>
+
+    <div class="tracker-day-panel">
+      <h3 id="trackerSelectedDateLabel">Today</h3>
+
+      <div class="tracker-section">
+        <label class="tracker-section-label">Today's plan / tasks <span class="tracker-time-tag">Morning</span></label>
+        <textarea id="trackerPlanInput" rows="4" placeholder="What are you planning to work on today?"></textarea>
+        <button type="button" id="trackerSavePlanBtn" class="secondary full-width">Save plan</button>
+        <p id="trackerPlanStatus" class="hint"></p>
+      </div>
+
+      <div class="tracker-section">
+        <label class="tracker-section-label">Remarks <span class="tracker-time-tag">Evening</span></label>
+        <textarea id="trackerRemarksInput" rows="4" placeholder="How did today go?"></textarea>
+        <label class="tracker-section-label">Rate your day</label>
+        <div class="tracker-rating" id="trackerRatingStars"></div>
+        <button type="button" id="trackerSaveRemarksBtn" class="primary full-width">Save remarks</button>
+        <p id="trackerRemarksStatus" class="hint"></p>
+      </div>
+    </div>
+  </div>
 
 </div>
 
@@ -131,6 +172,10 @@
     <button class="nav-item active" data-nav="home">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9"/></svg></span>
       <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-item" data-nav="tracker">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3.5" y1="10" x2="20.5" y2="10"/><circle cx="8" cy="14.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14.5" r="1.1" fill="currentColor" stroke="none"/></svg></span>
+      <span class="nav-label">Tracker</span>
     </button>
     <div class="nav-fab-slot">
       <button class="nav-fab hidden" id="addBtn" aria-label="Add cheque">+</button>

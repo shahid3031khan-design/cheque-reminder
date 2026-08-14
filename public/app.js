@@ -7,6 +7,15 @@ const state = {
   installmentRows: [],
   editingDealKey: null,
   currentDealKey: null,
+  currentView: "home",
+  trackerYear: new Date().getFullYear(),
+  trackerMonth: new Date().getMonth() + 1,
+  trackerSelectedDate: todayStr(),
+  trackerTargetUserId: null,
+  trackerMonthEntries: [],
+  trackerCurrentEntry: null,
+  trackerEmployeesLoaded: false,
+  trackerPendingRating: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -107,6 +116,20 @@ function applyRoleUI() {
   $("#navRightLabel").textContent = admin ? "Settings" : "Logout";
   $("#emptyHint").textContent = admin ? "Tap the + button below to add one." : "Nothing to show right now.";
 }
+
+function switchView(view) {
+  state.currentView = view;
+  $("#homeView").classList.toggle("hidden", view !== "home");
+  $("#trackerView").classList.toggle("hidden", view !== "tracker");
+  document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.nav === view);
+  });
+  if (view === "tracker") openTrackerView();
+}
+
+document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
+  btn.addEventListener("click", () => switchView(btn.dataset.nav));
+});
 
 $("#navRightBtn").addEventListener("click", () => {
   if (isAdmin()) { showSettings(); } else { doLogout(); }
@@ -501,6 +524,170 @@ $("#chequeForm").addEventListener("submit", async (e) => {
     $("#addFormStatus").textContent = err.message;
     $("#addFormStatus").classList.remove("hidden");
   }
+});
+
+// ---------- Tracker ----------
+
+function isViewingOwnTracker() {
+  return !state.trackerTargetUserId || state.trackerTargetUserId === state.currentUser.id;
+}
+
+function trackerUserIdParam() {
+  return isAdmin() && state.trackerTargetUserId ? state.trackerTargetUserId : "";
+}
+
+async function openTrackerView() {
+  if (isAdmin() && !state.trackerEmployeesLoaded) {
+    await loadTrackerEmployeeOptions();
+  }
+  await loadTrackerMonthEntries();
+  renderTrackerCalendar();
+  await selectTrackerDay(state.trackerSelectedDate);
+}
+
+async function loadTrackerEmployeeOptions() {
+  const allUsers = await api("/api/users");
+  state.trackerEmployeesLoaded = true;
+  state.trackerTargetUserId = state.currentUser.id;
+  const select = $("#trackerEmployeeSelect");
+  select.innerHTML = allUsers.map(u => `<option value="${u.id}"${u.id === state.currentUser.id ? " selected" : ""}>${escapeHtml(u.displayName || u.username)}${u.id === state.currentUser.id ? " (you)" : ""}</option>`).join("");
+  select.classList.remove("hidden");
+}
+
+$("#trackerEmployeeSelect").addEventListener("change", async (e) => {
+  state.trackerTargetUserId = e.target.value;
+  await loadTrackerMonthEntries();
+  renderTrackerCalendar();
+  await selectTrackerDay(state.trackerSelectedDate);
+});
+
+async function loadTrackerMonthEntries() {
+  const qs = new URLSearchParams({ year: state.trackerYear, month: state.trackerMonth });
+  const uid = trackerUserIdParam();
+  if (uid) qs.set("userId", uid);
+  state.trackerMonthEntries = await api(`/api/tracker/month?${qs.toString()}`);
+}
+
+function renderTrackerCalendar() {
+  const year = state.trackerYear, month = state.trackerMonth; // month is 1-12
+  $("#trackerMonthLabel").textContent = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  const firstOfMonth = new Date(year, month - 1, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7; // Sun=0..Sat=6 -> Mon=0..Sun=6
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = todayStr();
+
+  const entryByDate = {};
+  state.trackerMonthEntries.forEach((e) => { entryByDate[e.date] = e; });
+
+  let cells = "";
+  for (let i = 0; i < startOffset; i++) {
+    cells += `<button type="button" class="tracker-cal-day other-month" disabled></button>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const entry = entryByDate[dateStr];
+    const hasEntry = !!(entry && (entry.plan || entry.remarks || entry.rating));
+    const classes = ["tracker-cal-day"];
+    if (dateStr === today) classes.push("is-today");
+    if (dateStr === state.trackerSelectedDate) classes.push("is-selected");
+    if (entry && entry.rating) classes.push(`rating-${entry.rating}`);
+    cells += `<button type="button" class="${classes.join(" ")}" data-date="${dateStr}">${d}${hasEntry ? '<span class="entry-dot"></span>' : ""}</button>`;
+  }
+  $("#trackerCalGrid").innerHTML = cells;
+}
+
+$("#trackerCalGrid").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".tracker-cal-day[data-date]");
+  if (!btn) return;
+  await selectTrackerDay(btn.dataset.date);
+});
+
+$("#trackerPrevMonth").addEventListener("click", async () => {
+  state.trackerMonth -= 1;
+  if (state.trackerMonth < 1) { state.trackerMonth = 12; state.trackerYear -= 1; }
+  await loadTrackerMonthEntries();
+  renderTrackerCalendar();
+});
+
+$("#trackerNextMonth").addEventListener("click", async () => {
+  state.trackerMonth += 1;
+  if (state.trackerMonth > 12) { state.trackerMonth = 1; state.trackerYear += 1; }
+  await loadTrackerMonthEntries();
+  renderTrackerCalendar();
+});
+
+async function selectTrackerDay(dateStr) {
+  state.trackerSelectedDate = dateStr;
+  state.trackerPendingRating = null;
+  document.querySelectorAll(".tracker-cal-day[data-date]").forEach((btn) => {
+    btn.classList.toggle("is-selected", btn.dataset.date === dateStr);
+  });
+
+  const labelDate = new Date(dateStr + "T00:00:00");
+  const isToday = dateStr === todayStr();
+  $("#trackerSelectedDateLabel").textContent = (isToday ? "Today, " : "") + labelDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  const uid = trackerUserIdParam();
+  const entry = await api(`/api/tracker/entries/${dateStr}${uid ? `?userId=${encodeURIComponent(uid)}` : ""}`);
+  state.trackerCurrentEntry = entry;
+
+  const readOnly = !isViewingOwnTracker();
+  $("#trackerPlanInput").value = entry.plan || "";
+  $("#trackerPlanInput").disabled = readOnly;
+  $("#trackerRemarksInput").value = entry.remarks || "";
+  $("#trackerRemarksInput").disabled = readOnly;
+  $("#trackerSavePlanBtn").classList.toggle("hidden", readOnly);
+  $("#trackerSaveRemarksBtn").classList.toggle("hidden", readOnly);
+  $("#trackerPlanStatus").textContent = "";
+  $("#trackerRemarksStatus").textContent = "";
+  renderTrackerRatingStars(entry.rating, readOnly);
+}
+
+function renderTrackerRatingStars(rating, readOnly) {
+  const starIcon = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><polygon points="12 2.5 15.1 9 22 10 17 15 18.2 22 12 18.6 5.8 22 7 15 2 10 8.9 9"/></svg>';
+  const container = $("#trackerRatingStars");
+  container.innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" class="tracker-star ${rating >= n ? "active" : ""}" data-star="${n}" ${readOnly ? "disabled" : ""}>${starIcon}</button>`).join("");
+}
+
+$("#trackerRatingStars").addEventListener("click", (e) => {
+  const btn = e.target.closest(".tracker-star");
+  if (!btn || btn.disabled) return;
+  const value = Number(btn.dataset.star);
+  state.trackerPendingRating = value;
+  renderTrackerRatingStars(value, false);
+});
+
+$("#trackerSavePlanBtn").addEventListener("click", async () => {
+  const dateStr = state.trackerSelectedDate;
+  $("#trackerPlanStatus").textContent = "Saving...";
+  try {
+    const entry = await api(`/api/tracker/entries/${dateStr}`, { method: "PUT", body: JSON.stringify({ plan: $("#trackerPlanInput").value }) });
+    state.trackerCurrentEntry = entry;
+    $("#trackerPlanStatus").textContent = "Saved.";
+    await loadTrackerMonthEntries();
+    renderTrackerCalendar();
+  } catch (err) {
+    $("#trackerPlanStatus").textContent = err.message;
+  }
+  setTimeout(() => { $("#trackerPlanStatus").textContent = ""; }, 2000);
+});
+
+$("#trackerSaveRemarksBtn").addEventListener("click", async () => {
+  const dateStr = state.trackerSelectedDate;
+  const rating = state.trackerPendingRating !== null ? state.trackerPendingRating : (state.trackerCurrentEntry?.rating ?? null);
+  $("#trackerRemarksStatus").textContent = "Saving...";
+  try {
+    const entry = await api(`/api/tracker/entries/${dateStr}`, { method: "PUT", body: JSON.stringify({ remarks: $("#trackerRemarksInput").value, rating }) });
+    state.trackerCurrentEntry = entry;
+    state.trackerPendingRating = null;
+    $("#trackerRemarksStatus").textContent = "Saved.";
+    await loadTrackerMonthEntries();
+    renderTrackerCalendar();
+  } catch (err) {
+    $("#trackerRemarksStatus").textContent = err.message;
+  }
+  setTimeout(() => { $("#trackerRemarksStatus").textContent = ""; }, 2000);
 });
 
 // ---------- Settings ----------

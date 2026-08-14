@@ -51,7 +51,7 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", auth.requireAuth, (req, res) => {
-  res.json({ username: req.user.username, role: req.user.role, displayName: req.user.displayName });
+  res.json({ id: req.user.userId, username: req.user.username, role: req.user.role, displayName: req.user.displayName });
 });
 
 app.get("/api/display-settings", auth.requireAuth, async (req, res) => {
@@ -210,6 +210,53 @@ app.post("/api/test-reminder", auth.requireAdmin, async (req, res) => {
   if (config.whatsapp?.enabled) results.whatsapp = await reminders.sendWhatsApp(config.whatsapp, message);
   if (config.push?.enabled) results.push = await reminders.sendPush(config.push, title, message);
   res.json(results);
+});
+
+// ---------- Tracker (daily employee work log) ----------
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function resolveTrackerUserId(req) {
+  // Employees can only ever see their own tracker; admins may view anyone's via ?userId=
+  if (req.query.userId && req.user.role === "admin") return req.query.userId;
+  return req.user.userId;
+}
+
+app.get("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
+  if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
+  const userId = resolveTrackerUserId(req);
+  const entry = await db.getTrackerEntry(userId, req.params.date);
+  res.json(entry || { userId, date: req.params.date, plan: "", remarks: "", rating: null });
+});
+
+app.get("/api/tracker/month", auth.requireAuth, async (req, res) => {
+  const year = parseInt(req.query.year, 10);
+  const month = parseInt(req.query.month, 10);
+  if (!year || !month || month < 1 || month > 12) return res.status(400).json({ error: "Invalid year/month" });
+  const userId = resolveTrackerUserId(req);
+  const entries = await db.getTrackerMonth(userId, year, month);
+  res.json(entries);
+});
+
+app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
+  if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
+  // Always the logged-in user's own entry - admins can view others' tracker but not edit them.
+  const fields = {};
+  if (req.body.plan !== undefined) fields.plan = String(req.body.plan).slice(0, 5000);
+  if (req.body.remarks !== undefined) fields.remarks = String(req.body.remarks).slice(0, 5000);
+  if (req.body.rating !== undefined) {
+    if (req.body.rating === null) {
+      fields.rating = null;
+    } else {
+      const rating = Number(req.body.rating);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be an integer from 1 to 5" });
+      }
+      fields.rating = rating;
+    }
+  }
+  const entry = await db.upsertTrackerEntry(req.user.userId, req.params.date, fields);
+  res.json(entry);
 });
 
 // ---------- Boot ----------
