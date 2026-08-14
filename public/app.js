@@ -109,7 +109,6 @@ function showApp() {
 
 function updateAddBtnVisibility() {
   const show = isAdmin() && state.currentView === "home";
-  $(".nav-fab-slot").classList.toggle("hidden", !show);
   $("#addBtn").classList.toggle("hidden", !show);
 }
 
