@@ -3,6 +3,8 @@ const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const cron = require("node-cron");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const db = require("./lib/db");
 const auth = require("./lib/auth");
@@ -10,6 +12,37 @@ const reminders = require("./lib/reminders");
 
 const app = express();
 const PORT = process.env.PORT || 8743;
+
+// Render sits behind a reverse proxy - without this, express-rate-limit and
+// the "secure" cookie flag would see every request as coming from the same
+// internal proxy address/protocol instead of the real client.
+app.set("trust proxy", 1);
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // the small inline service-worker registration script
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Google Fonts + one inline style attribute
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"], // clickjacking protection (belt-and-braces alongside X-Frame-Options)
+    },
+  },
+}));
+
+// Blanket API limiter as baseline abuse protection, plus a much stricter
+// limiter on login specifically to slow down password brute-forcing.
+app.use("/api/", rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Please try again later." },
+});
 
 app.use(express.json());
 app.use(cookieParser());
@@ -32,7 +65,7 @@ function publicUser(u) {
 
 // ---------- Auth ----------
 
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", loginLimiter, async (req, res) => {
   const username = String(req.body.username || "").trim();
   const user = await db.findUserByUsername(username);
   if (user && auth.checkPassword(req.body.password || "", user.passwordHash, user.passwordSalt)) {
@@ -218,7 +251,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function resolveTrackerUserId(req) {
   // Employees can only ever see their own tracker; admins may view anyone's via ?userId=
-  if (req.query.userId && req.user.role === "admin") return req.query.userId;
+  // Coerced to String so a crafted query string (e.g. ?userId[$ne]=null, which Express's
+  // query parser turns into an object) can never reach a MongoDB filter as an operator.
+  if (req.query.userId && req.user.role === "admin") return String(req.query.userId);
   return req.user.userId;
 }
 
@@ -276,7 +311,7 @@ app.post("/api/tasks", auth.requireAdmin, async (req, res) => {
   const b = req.body;
   const title = String(b.title || "").trim();
   if (!title) return res.status(400).json({ error: "Task title is required" });
-  const assignedTo = Array.isArray(b.assignedTo) ? b.assignedTo.filter(Boolean) : [];
+  const assignedTo = Array.isArray(b.assignedTo) ? b.assignedTo.filter((v) => typeof v === "string" && v).map(String) : [];
   if (assignedTo.length === 0) return res.status(400).json({ error: "Assign the task to at least one employee" });
   const priority = PRIORITIES.includes(b.priority) ? b.priority : "medium";
   const task = {
@@ -304,7 +339,7 @@ app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
     if (req.body.description !== undefined) fields.description = String(req.body.description).slice(0, 5000);
     if (req.body.priority !== undefined && PRIORITIES.includes(req.body.priority)) fields.priority = req.body.priority;
     if (req.body.assignedTo !== undefined) {
-      const assignedTo = Array.isArray(req.body.assignedTo) ? req.body.assignedTo.filter(Boolean) : [];
+      const assignedTo = Array.isArray(req.body.assignedTo) ? req.body.assignedTo.filter((v) => typeof v === "string" && v).map(String) : [];
       if (assignedTo.length === 0) return res.status(400).json({ error: "Assign the task to at least one employee" });
       fields.assignedTo = assignedTo;
     }
@@ -331,7 +366,8 @@ app.delete("/api/tasks/:id", auth.requireAdmin, async (req, res) => {
 
 function resolveCallsUserId(req) {
   // Employees can only ever see/add their own calls; admins may view anyone's via ?userId=
-  if (req.query.userId && req.user.role === "admin") return req.query.userId;
+  // Coerced to String for the same reason as resolveTrackerUserId above.
+  if (req.query.userId && req.user.role === "admin") return String(req.query.userId);
   return req.user.userId;
 }
 
