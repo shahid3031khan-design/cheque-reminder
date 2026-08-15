@@ -92,6 +92,59 @@ app.get("/api/display-settings", auth.requireAuth, async (req, res) => {
   res.json({ currencySymbol: config.currencySymbol });
 });
 
+// ---------- My Notifications (every user manages their own - admin included) ----------
+
+app.get("/api/me/notifications", auth.requireAuth, async (req, res) => {
+  const user = await db.findUserById(req.user.userId);
+  res.json(user?.notify || db.DEFAULT_NOTIFY);
+});
+
+app.put("/api/me/notifications", auth.requireAuth, async (req, res) => {
+  const b = req.body;
+  const notify = {
+    email: {
+      enabled: !!b.email?.enabled,
+      address: String(b.email?.address || "").trim(),
+    },
+    whatsapp: {
+      enabled: !!b.whatsapp?.enabled,
+      phone: String(b.whatsapp?.phone || "").trim(),
+      apiKey: String(b.whatsapp?.apiKey || "").trim(),
+    },
+    push: {
+      enabled: !!b.push?.enabled,
+      ntfyTopic: String(b.push?.ntfyTopic || "").trim(),
+    },
+  };
+  const updated = await db.updateUserNotifyPrefs(req.user.userId, notify);
+  res.json(updated.notify);
+});
+
+app.post("/api/me/notifications/test", auth.requireAuth, async (req, res) => {
+  const channel = req.body.channel;
+  if (!["email", "whatsapp", "push"].includes(channel)) return res.status(400).json({ error: "Invalid channel" });
+
+  const user = await db.findUserById(req.user.userId);
+  const notify = user?.notify || {};
+  const title = "Cheque Reminder test";
+  const message = "This is a test notification from your Cheque Reminder app. If you can see/receive this, the channel works.";
+
+  let ok = false;
+  if (channel === "email") {
+    const config = await db.getConfig();
+    if (!config.email?.enabled) return res.status(400).json({ error: "Email sending isn't set up yet - ask your admin to configure it in Settings." });
+    if (!notify.email?.address) return res.status(400).json({ error: "Enter your email address first" });
+    ok = await reminders.sendEmail(config.email, notify.email.address, title, message);
+  } else if (channel === "whatsapp") {
+    if (!notify.whatsapp?.phone || !notify.whatsapp?.apiKey) return res.status(400).json({ error: "Enter your WhatsApp number and API key first" });
+    ok = await reminders.sendWhatsApp(notify.whatsapp, message);
+  } else if (channel === "push") {
+    if (!notify.push?.ntfyTopic) return res.status(400).json({ error: "Enter your ntfy topic first" });
+    ok = await reminders.sendPush(notify.push, title, message);
+  }
+  res.json({ ok });
+});
+
 // ---------- Users (admin only) ----------
 
 app.get("/api/users", auth.requireAdmin, async (req, res) => {
@@ -234,17 +287,6 @@ app.put("/api/config", auth.requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/test-reminder", auth.requireAdmin, async (req, res) => {
-  const config = await db.getConfig();
-  const title = "Cheque Reminder test";
-  const message = "This is a test reminder from your Cheque Reminder app. If you can see/receive this, the channel works.";
-  const results = {};
-  if (config.email?.enabled) results.email = await reminders.sendEmail(config.email, title, message);
-  if (config.whatsapp?.enabled) results.whatsapp = await reminders.sendWhatsApp(config.whatsapp, message);
-  if (config.push?.enabled) results.push = await reminders.sendPush(config.push, title, message);
-  res.json(results);
-});
-
 // ---------- Tracker (daily employee work log) ----------
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -326,6 +368,9 @@ app.post("/api/tasks", auth.requireAdmin, async (req, res) => {
     createdAt: new Date().toISOString(),
   };
   await db.createTask(task);
+  const allUsers = await db.getUsers();
+  const assignedBy = allUsers.find((u) => u.id === req.user.userId) || { username: "Admin" };
+  reminders.notifyTaskAssigned(task, assignedBy, allUsers).catch((err) => console.error("Task-assigned notify failed:", err));
   res.status(201).json(task);
 });
 
@@ -348,13 +393,25 @@ app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
       if (!TASK_STATUSES.includes(req.body.status)) return res.status(400).json({ error: "Invalid status" });
       fields.status = req.body.status;
     }
-    return res.json(await db.updateTask(task.id, fields));
+    const updated = await db.updateTask(task.id, fields);
+    if (fields.status === "done" && task.status !== "done") {
+      const allUsers = await db.getUsers();
+      const actingUser = allUsers.find((u) => u.id === req.user.userId) || { username: "Admin", role: "admin" };
+      reminders.notifyTaskDone(updated, actingUser, allUsers).catch((err) => console.error("Task-done notify failed:", err));
+    }
+    return res.json(updated);
   }
 
   // Employees may only update the status of a task assigned to them.
   if (!task.assignedTo.includes(req.user.userId)) return res.status(403).json({ error: "Not your task" });
   if (!TASK_STATUSES.includes(req.body.status)) return res.status(400).json({ error: "Invalid status" });
-  res.json(await db.updateTask(task.id, { status: req.body.status }));
+  const updated = await db.updateTask(task.id, { status: req.body.status });
+  if (req.body.status === "done" && task.status !== "done") {
+    const allUsers = await db.getUsers();
+    const actingUser = allUsers.find((u) => u.id === req.user.userId) || { username: req.user.username, role: "employee" };
+    reminders.notifyTaskDone(updated, actingUser, allUsers).catch((err) => console.error("Task-done notify failed:", err));
+  }
+  res.json(updated);
 });
 
 app.delete("/api/tasks/:id", auth.requireAdmin, async (req, res) => {
@@ -431,6 +488,7 @@ async function start() {
   // Daily reminder sweep at 9am server time, plus dedupe means re-running is harmless.
   cron.schedule("0 9 * * *", () => {
     reminders.runDailyReminderCheck().catch((err) => console.error("Reminder check failed:", err));
+    reminders.runTaskReminderCheck().catch((err) => console.error("Task reminder check failed:", err));
   });
 
   app.listen(PORT, () => {

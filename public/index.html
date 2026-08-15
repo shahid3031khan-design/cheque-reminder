@@ -80,6 +80,7 @@
     </div>
     <div class="topbar-right">
       <span id="userBadge" class="user-badge"></span>
+      <button id="notifBtn" class="icon-btn" title="My Notifications" aria-label="My Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
       <button id="settingsBtn" class="icon-btn hidden" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     </div>
   </header>
@@ -249,7 +250,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version">v1.32</div>
+<div id="appVersion" class="app-version">v1.40</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -359,39 +360,14 @@
       </label>
 
       <fieldset>
-        <legend><label><input type="checkbox" id="emailEnabled"> Email reminders</label></legend>
-        <p class="hint">Use a Gmail <strong>App Password</strong> (Google Account → Security → 2-Step Verification → App passwords), not your normal password.</p>
+        <legend><label><input type="checkbox" id="emailEnabled"> Email sending account</label></legend>
+        <p class="hint">Use a Gmail <strong>App Password</strong> (Google Account → Security → 2-Step Verification → App passwords), not your normal password. This is the account emails are sent <em>from</em> - each person picks their own address to receive reminders at under the bell icon ("My Notifications").</p>
         <label>Your Gmail address
           <input type="email" id="smtpUser" placeholder="you@gmail.com">
         </label>
         <label>Gmail App Password
           <input type="text" id="smtpAppPassword" placeholder="xxxx xxxx xxxx xxxx">
         </label>
-        <label>Send reminders to
-          <input type="email" id="emailTo" placeholder="you@gmail.com">
-        </label>
-        <button type="button" class="secondary test-btn" data-channel="email">Send test</button>
-      </fieldset>
-
-      <fieldset>
-        <legend><label><input type="checkbox" id="whatsappEnabled"> WhatsApp reminders</label></legend>
-        <p class="hint">Free via CallMeBot: add contact <strong>+34 644 84 71 65</strong> in WhatsApp, send it the message <strong>"I allow callmebot to send me messages"</strong>, and it will reply with your personal API key.</p>
-        <label>Your WhatsApp number (with country code, no + or spaces)
-          <input type="text" id="waPhone" placeholder="919999999999">
-        </label>
-        <label>CallMeBot API key
-          <input type="text" id="waApiKey" placeholder="123456">
-        </label>
-        <button type="button" class="secondary test-btn" data-channel="whatsapp">Send test</button>
-      </fieldset>
-
-      <fieldset>
-        <legend><label><input type="checkbox" id="pushEnabled"> Phone push notifications</label></legend>
-        <p class="hint">Free via ntfy: install the <strong>ntfy</strong> app (Android/iOS), subscribe to a topic name only you know, and enter that same topic name below.</p>
-        <label>ntfy topic name
-          <input type="text" id="ntfyTopic" placeholder="cheque-reminder-yourname-1234">
-        </label>
-        <button type="button" class="secondary test-btn" data-channel="push">Send test</button>
       </fieldset>
 
       <div class="form-actions">
@@ -434,6 +410,53 @@
     <div class="users-section">
       <button type="button" id="settingsLogoutBtn" class="secondary full-width">Log out</button>
     </div>
+  </div>
+</div>
+
+<div id="notifModal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2>My Notifications</h2>
+      <button id="closeNotifBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <p class="hint">Choose how you personally get reminded about upcoming cheques and your tasks.</p>
+    <form id="notifForm">
+      <fieldset>
+        <legend><label><input type="checkbox" id="notifEmailEnabled"> Email</label></legend>
+        <p class="hint" id="notifEmailHint">Ask your admin to set up the sending account in Settings first if this doesn't send.</p>
+        <label>Your email address
+          <input type="email" id="notifEmailAddress" placeholder="you@example.com">
+        </label>
+        <button type="button" class="secondary test-btn" data-channel="email">Send test</button>
+      </fieldset>
+
+      <fieldset>
+        <legend><label><input type="checkbox" id="notifWaEnabled"> WhatsApp</label></legend>
+        <p class="hint">Free via CallMeBot: add contact <strong>+34 644 84 71 65</strong> in WhatsApp, send it the message <strong>"I allow callmebot to send me messages"</strong>, and it will reply with your personal API key.</p>
+        <label>Your WhatsApp number (with country code, no + or spaces)
+          <input type="text" id="notifWaPhone" placeholder="919999999999">
+        </label>
+        <label>CallMeBot API key
+          <input type="text" id="notifWaApiKey" placeholder="123456">
+        </label>
+        <button type="button" class="secondary test-btn" data-channel="whatsapp">Send test</button>
+      </fieldset>
+
+      <fieldset>
+        <legend><label><input type="checkbox" id="notifPushEnabled"> Phone push</label></legend>
+        <p class="hint">Free via ntfy: install the <strong>ntfy</strong> app (Android/iOS), subscribe to a topic name only you know, and enter that same topic name below.</p>
+        <label>ntfy topic name
+          <input type="text" id="notifPushTopic" placeholder="cheque-reminder-yourname-1234">
+        </label>
+        <button type="button" class="secondary test-btn" data-channel="push">Send test</button>
+      </fieldset>
+
+      <div class="form-actions">
+        <button type="submit" class="primary">Save</button>
+      </div>
+      <p id="notifStatus" class="hint"></p>
+    </form>
   </div>
 </div>
 

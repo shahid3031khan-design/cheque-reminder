@@ -1044,12 +1044,6 @@ async function loadConfig() {
   $("#emailEnabled").checked = !!state.config.email?.enabled;
   $("#smtpUser").value = state.config.email?.smtpUser || "";
   $("#smtpAppPassword").value = state.config.email?.smtpAppPassword || "";
-  $("#emailTo").value = state.config.email?.to || "";
-  $("#whatsappEnabled").checked = !!state.config.whatsapp?.enabled;
-  $("#waPhone").value = state.config.whatsapp?.phone || "";
-  $("#waApiKey").value = state.config.whatsapp?.apiKey || "";
-  $("#pushEnabled").checked = !!state.config.push?.enabled;
-  $("#ntfyTopic").value = state.config.push?.ntfyTopic || "";
 }
 
 function openSettingsModal() { $("#settingsModal").classList.remove("hidden"); }
@@ -1077,16 +1071,6 @@ $("#settingsForm").addEventListener("submit", async (e) => {
       smtpPort: state.config.email?.smtpPort || 587,
       smtpUser: $("#smtpUser").value,
       smtpAppPassword: $("#smtpAppPassword").value,
-      to: $("#emailTo").value,
-    },
-    whatsapp: {
-      enabled: $("#whatsappEnabled").checked,
-      phone: $("#waPhone").value,
-      apiKey: $("#waApiKey").value,
-    },
-    push: {
-      enabled: $("#pushEnabled").checked,
-      ntfyTopic: $("#ntfyTopic").value,
     },
   };
   await api("/api/config", { method: "PUT", body: JSON.stringify(config) });
@@ -1096,14 +1080,53 @@ $("#settingsForm").addEventListener("submit", async (e) => {
   setTimeout(() => { $("#settingsStatus").textContent = ""; }, 2000);
 });
 
+// ---------- My Notifications (per-user prefs) ----------
+
+async function loadNotifPrefs() {
+  const notify = await api("/api/me/notifications");
+  $("#notifEmailEnabled").checked = !!notify.email?.enabled;
+  $("#notifEmailAddress").value = notify.email?.address || "";
+  $("#notifWaEnabled").checked = !!notify.whatsapp?.enabled;
+  $("#notifWaPhone").value = notify.whatsapp?.phone || "";
+  $("#notifWaApiKey").value = notify.whatsapp?.apiKey || "";
+  $("#notifPushEnabled").checked = !!notify.push?.enabled;
+  $("#notifPushTopic").value = notify.push?.ntfyTopic || "";
+}
+
+function openNotifModal() { $("#notifModal").classList.remove("hidden"); }
+function closeNotifModal() { $("#notifModal").classList.add("hidden"); }
+
+$("#notifBtn").addEventListener("click", async () => {
+  await loadNotifPrefs();
+  openNotifModal();
+});
+$("#closeNotifBtn").addEventListener("click", closeNotifModal);
+$("#notifModal").addEventListener("click", (e) => {
+  if (e.target.id === "notifModal") closeNotifModal();
+});
+
+$("#notifForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const notify = {
+    email: { enabled: $("#notifEmailEnabled").checked, address: $("#notifEmailAddress").value },
+    whatsapp: { enabled: $("#notifWaEnabled").checked, phone: $("#notifWaPhone").value, apiKey: $("#notifWaApiKey").value },
+    push: { enabled: $("#notifPushEnabled").checked, ntfyTopic: $("#notifPushTopic").value },
+  };
+  await api("/api/me/notifications", { method: "PUT", body: JSON.stringify(notify) });
+  $("#notifStatus").textContent = "Saved.";
+  setTimeout(() => { $("#notifStatus").textContent = ""; }, 2000);
+});
+
 document.querySelectorAll(".test-btn").forEach(btn => {
   btn.addEventListener("click", async () => {
+    const channel = btn.dataset.channel;
     btn.textContent = "Sending...";
     try {
-      await api("/api/test-reminder", { method: "POST" });
+      await api("/api/me/notifications/test", { method: "POST", body: JSON.stringify({ channel }) });
       btn.textContent = "Sent! Check now";
-    } catch {
+    } catch (err) {
       btn.textContent = "Failed";
+      $("#notifStatus").textContent = err.message || "Test failed.";
     }
     setTimeout(() => { btn.textContent = "Send test"; }, 2500);
   });
