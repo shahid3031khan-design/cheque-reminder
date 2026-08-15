@@ -1,19 +1,19 @@
 :root {
-  /* Light glass theme - soft peach-to-lavender gradient with frosted white cards. */
-  --bg-gradient: linear-gradient(135deg, #f7cbae 0%, #ecb9cd 45%, #c8b3e8 100%);
-  --bg: #eec9cf; /* flat fallback for surfaces that can't show the gradient */
+  /* Light theme - soft cream-to-lavender gradient with white cards and an indigo/purple brand accent. */
+  --bg-gradient: linear-gradient(160deg, #fdf9f6 0%, #f7f2fb 50%, #ede6fa 100%);
+  --bg: #f3eefc; /* flat fallback for surfaces that can't show the gradient */
   --panel: #ffffff;
-  --text: #1c1c1e;
-  --text-muted: #8b8b93;
-  --border: rgba(28, 28, 30, 0.08);
+  --text: #1b1b2b;
+  --text-muted: #8b8b95;
+  --border: rgba(27, 27, 43, 0.08);
 
-  --yellow: #1c1c1e; /* brand/primary action = near-black, matches the reference's black buttons/pills */
-  --yellow-dark: #000000;
-  --yellow-soft: #efeff1;
+  --yellow: #6c5dd3; /* brand/primary action = indigo-violet, matches the reference's purple buttons/pills */
+  --yellow-dark: #5647b8;
+  --yellow-soft: #ede9fb;
   --yellow-text: #ffffff; /* text/icon color for content sitting on --yellow */
 
   /* Medium-severity warm accent (urgent/soon cheques, pending stats) - kept distinct
-     from brand black so cheque status stays readable at a glance. */
+     from brand purple so cheque status stays readable at a glance. */
   --warning: #e8a33d;
   --warning-dark: #c97f1f;
   --warning-soft: #fbe7cf;
@@ -26,7 +26,7 @@
   --red-soft: #fbdce2;
   --gray-soft: #eeeeee;
 
-  /* Warm gold for the tracker's 1-5 rating stars, distinct from brand black. */
+  /* Warm gold for the tracker's 1-5 rating stars, distinct from brand purple. */
   --star: #f2b544;
 
   /* Category icon-badge tints, used on the four stat cards (calendar/calendar/warning/document) */
@@ -38,12 +38,12 @@
   --icon-purple-bg: #ede0fa;
 
   /* Frosted-glass surfaces (blurred translucent white) for the topbar/bottom-nav/cards/modals. */
-  --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-card-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-card-bg: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.7);
   --glass-blur: 20px;
 
-  --shadow: 0 10px 28px rgba(120, 70, 100, 0.16);
+  --shadow: 0 10px 28px rgba(90, 70, 160, 0.12);
   --radius: 22px;
 }
 
@@ -84,6 +84,15 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+/* The topbar's date line reads as plain muted text, not an uppercase brand-colored kicker
+   like the login screen's "CHEQUE REMINDER" label (which stays on the shared .eyebrow rule). */
+#todayLabel {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+#todayLabel svg { display: none; }
 .eyebrow svg { width: 15px; height: 15px; flex-shrink: 0; }
 
 .topbar h1 {
@@ -91,6 +100,11 @@ body {
   margin: 0;
   font-weight: 800;
   letter-spacing: -0.01em;
+}
+.topbar-tagline {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 .icon-btn {
@@ -151,6 +165,11 @@ button svg { vertical-align: middle; }
 .stat-icon-badge.badge-blue { background: var(--icon-blue-bg); color: var(--icon-blue); }
 .stat-icon-badge.badge-coral { background: var(--red-soft); color: var(--red); }
 .stat-icon-badge.badge-purple { background: var(--icon-purple-bg); color: var(--icon-purple); }
+
+/* Stat numbers pick up their card's accent color; "Pending total" stays neutral. */
+.stat-urgent .stat-num { color: var(--icon-mint); }
+.stat-soon .stat-num { color: var(--icon-blue); }
+.stat-overdue .stat-num { color: var(--red); }
 
 .stat-num {
   display: block;
@@ -327,7 +346,7 @@ button svg { vertical-align: middle; }
 .badge.overdue { background: var(--red-soft); color: var(--red); }
 .badge.urgent { background: var(--warning-soft); color: var(--warning-dark); }
 .badge.soon { background: var(--warning-soft); color: var(--warning); }
-.badge.later { background: var(--gray-soft); color: var(--text-muted); }
+.badge.later { background: var(--icon-blue-bg); color: var(--icon-blue); }
 .badge.ok { background: var(--success-soft); color: var(--success); }
 .badge.priority-low { background: var(--success-soft); color: var(--success); }
 .badge.priority-medium { background: var(--warning-soft); color: var(--warning-dark); }
@@ -376,7 +395,7 @@ button svg { vertical-align: middle; }
   border-radius: 20px;
   white-space: nowrap;
 }
-.nav-item.active { color: var(--yellow-text); background: var(--yellow); }
+.nav-item.active { color: var(--yellow); background: var(--panel); box-shadow: var(--shadow); }
 .nav-icon { line-height: 1; display: flex; }
 .nav-icon svg { width: 16px; height: 16px; }
 .nav-label { font-size: 0.62rem; font-weight: 600; }
@@ -412,7 +431,7 @@ button svg { vertical-align: middle; }
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(28, 28, 30, 0.35);
+  box-shadow: 0 8px 18px rgba(108, 93, 211, 0.4);
 }
 .fab-pill:hover { background: var(--yellow-dark); }
 .fab-pill-icon {

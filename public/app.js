@@ -146,6 +146,7 @@ function switchView(view) {
   $("#tasksView").classList.toggle("hidden", view !== "tasks");
   $("#callsView").classList.toggle("hidden", view !== "calls");
   $("#pageTitle").classList.toggle("hidden", view !== "home");
+  $("#pageTagline").classList.toggle("hidden", view !== "home");
   updateAddBtnVisibility();
   document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.nav === view);
