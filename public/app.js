@@ -1098,6 +1098,9 @@ function closeNotifModal() { $("#notifModal").classList.add("hidden"); }
 
 $("#notifBtn").addEventListener("click", async () => {
   await loadNotifPrefs();
+  $("#notifIntro").textContent = isAdmin()
+    ? "Choose how you personally get reminded about upcoming cheques and your tasks."
+    : "Choose how you personally get reminded about your tasks.";
   openNotifModal();
 });
 $("#closeNotifBtn").addEventListener("click", closeNotifModal);
