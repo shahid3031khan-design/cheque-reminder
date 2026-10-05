@@ -569,7 +569,8 @@ app.post("/api/tasks", auth.requireAdmin, async (req, res) => {
   const allUsers = await db.getUsers();
   const assignedBy = allUsers.find((u) => u.id === req.user.userId) || { username: "Admin" };
   reminders.notifyTaskAssigned(task, assignedBy, allUsers).catch((err) => console.error("Task-assigned notify failed:", err));
-  res.status(201).json(task);
+  const unreachable = await reminders.unreachableAssignees(assignedTo, allUsers).catch(() => []);
+  res.status(201).json({ ...task, unreachable });
 });
 
 app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
@@ -592,12 +593,19 @@ app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
       fields.status = req.body.status;
     }
     const updated = await db.updateTask(task.id, fields);
+    const allUsers = await db.getUsers();
+    const actingUser = allUsers.find((u) => u.id === req.user.userId) || { username: "Admin", role: "admin" };
     if (fields.status === "done" && task.status !== "done") {
-      const allUsers = await db.getUsers();
-      const actingUser = allUsers.find((u) => u.id === req.user.userId) || { username: "Admin", role: "admin" };
       reminders.notifyTaskDone(updated, actingUser, allUsers).catch((err) => console.error("Task-done notify failed:", err));
     }
-    return res.json(updated);
+    // Anyone newly added to the task is told, exactly as if it had been assigned to them from the start.
+    const added = (fields.assignedTo || []).filter((id) => !task.assignedTo.includes(id));
+    let unreachable = [];
+    if (added.length && updated.status !== "done") {
+      reminders.notifyTaskAssigned({ ...updated, assignedTo: added }, actingUser, allUsers).catch((err) => console.error("Task-assigned notify failed:", err));
+      unreachable = await reminders.unreachableAssignees(added, allUsers).catch(() => []);
+    }
+    return res.json({ ...updated, unreachable });
   }
 
   // Employees may only update the status of a task assigned to them.

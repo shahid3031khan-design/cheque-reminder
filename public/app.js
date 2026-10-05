@@ -1291,6 +1291,23 @@ $("#tasksList").addEventListener("click", async (e) => {
   }
 });
 
+// The server says who it had no way to alert (no phone with notifications on, no other channel set up).
+// Tell the assigner so they can ask those people to turn notifications on; the task is in their list regardless.
+let tasksNoteTimer = null;
+function showTasksNote(unreachable) {
+  const note = $("#tasksNote");
+  clearTimeout(tasksNoteTimer);
+  if (!Array.isArray(unreachable) || unreachable.length === 0) {
+    note.classList.add("hidden");
+    return;
+  }
+  const names = unreachable.map(escapeHtml).join(", ");
+  const plural = unreachable.length > 1;
+  note.innerHTML = `Task assigned, but <strong>${names}</strong> ${plural ? "haven't" : "hasn't"} turned on notifications, so they won't get an alert on ${plural ? "their phones" : "their phone"}. Ask them to open the app and tap <strong>Turn on</strong> (home screen card, or the bell icon). The task is already in their Tasks tab.`;
+  note.classList.remove("hidden");
+  tasksNoteTimer = setTimeout(() => note.classList.add("hidden"), 30000);
+}
+
 function renderTaskAssigneeOptions() {
   const container = $("#taskAssigneeSelect");
   container.innerHTML = state.taskEmployees
@@ -1339,7 +1356,7 @@ $("#addTaskForm").addEventListener("submit", async (e) => {
     return;
   }
   try {
-    await api("/api/tasks", {
+    const created = await api("/api/tasks", {
       method: "POST",
       body: JSON.stringify({
         title: $("#taskTitle").value.trim(),
@@ -1350,6 +1367,7 @@ $("#addTaskForm").addEventListener("submit", async (e) => {
       }),
     });
     closeAddTaskModal();
+    showTasksNote(created?.unreachable);
     await loadTasks();
     renderTasksList();
   } catch (err) {

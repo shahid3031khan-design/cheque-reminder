@@ -753,6 +753,22 @@ select {
 .account-who { margin: 4px 0 16px; }
 #accountPw { margin-top: 10px; }
 
+/* Tasks: heads-up shown to the assigner when someone can't be alerted */
+.tasks-note {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: var(--glass-card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-left: 4px solid #e0a43a;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 /* Phone notifications: home prompt, "this phone" section, attendance reminder days */
 .push-prompt {
   display: flex;
