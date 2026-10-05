@@ -126,8 +126,8 @@ app.post("/api/me/notifications/test", auth.requireAuth, async (req, res) => {
 
   const user = await db.findUserById(req.user.userId);
   const notify = user?.notify || {};
-  const title = "Cheque Reminder test";
-  const message = "This is a test notification from your Cheque Reminder app. If you can see/receive this, the channel works.";
+  const title = "Profile test";
+  const message = "This is a test notification from your Profile app. If you can see/receive this, the channel works.";
 
   let ok = false;
   if (channel === "email") {

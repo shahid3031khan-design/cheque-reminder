@@ -1,4 +1,4 @@
-const CACHE_NAME = "cheque-reminder-shell-v1";
+const CACHE_NAME = "profile-shell-v2";
 const SHELL_ASSETS = ["/", "/style.css", "/app.js"];
 
 self.addEventListener("install", (event) => {
