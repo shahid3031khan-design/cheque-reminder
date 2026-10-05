@@ -1643,6 +1643,7 @@ function openAccountModal() {
   $("#accountRole").textContent = user.role === "admin" ? "Admin" : "Employee";
   $("#accountRole").className = `user-row-role ${user.role}`;
   $("#accountUsername").textContent = `@${user.username}`;
+  $("#accountNote").classList.toggle("hidden", user.role !== "employee"); // admins can reset passwords themselves
   resetAccountPassword();
   $("#accountModal").classList.remove("hidden");
 }
