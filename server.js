@@ -291,6 +291,7 @@ app.put("/api/config", auth.requireAdmin, async (req, res) => {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const LEAVE_TYPES = ["sick", "annual", "casual", "other"];
 
 function resolveTrackerUserId(req) {
   // Employees can only ever see their own tracker; admins may view anyone's via ?userId=
@@ -304,7 +305,7 @@ app.get("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
   if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
   const userId = resolveTrackerUserId(req);
   const entry = await db.getTrackerEntry(userId, req.params.date);
-  res.json(entry || { userId, date: req.params.date, loginTime: "", plan: "", remarks: "", rating: null, logoutTime: "" });
+  res.json(entry || { userId, date: req.params.date, loginTime: "", plan: "", remarks: "", rating: null, logoutTime: "", onLeave: false, leaveType: "", leaveReason: "" });
 });
 
 app.get("/api/tracker/month", auth.requireAuth, async (req, res) => {
@@ -326,6 +327,17 @@ app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
     if (!TIME_RE.test(value)) return res.status(400).json({ error: `Invalid ${label} time` });
     fields[key] = value;
   }
+  if (req.body.leaveType !== undefined) {
+    const leaveType = String(req.body.leaveType);
+    if (leaveType !== "" && !LEAVE_TYPES.includes(leaveType)) return res.status(400).json({ error: "Invalid leave type" });
+    fields.leaveType = leaveType;
+  }
+  if (req.body.leaveReason !== undefined) fields.leaveReason = String(req.body.leaveReason).slice(0, 500);
+  if (req.body.onLeave !== undefined) {
+    if (typeof req.body.onLeave !== "boolean") return res.status(400).json({ error: "Invalid leave status" });
+    fields.onLeave = req.body.onLeave;
+    if (!req.body.onLeave) { fields.leaveType = ""; fields.leaveReason = ""; } // cancelling a leave clears its details
+  }
   if (req.body.plan !== undefined) fields.plan = String(req.body.plan).slice(0, 5000);
   if (req.body.remarks !== undefined) fields.remarks = String(req.body.remarks).slice(0, 5000);
   if (req.body.rating !== undefined) {
@@ -343,6 +355,16 @@ app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
   // Each step of the day unlocks the next: attendance -> morning plan -> evening plan -> logout.
   const existing = await db.getTrackerEntry(req.user.userId, req.params.date);
   const merged = { ...(existing || {}), ...fields };
+  // A day is either worked (attendance flow) or a leave day - never both. Cancel the leave to work that day.
+  if (fields.onLeave === true && existing?.loginTime) {
+    return res.status(400).json({ error: "Attendance is already marked for this day" });
+  }
+  if (fields.onLeave === true && !merged.leaveType) {
+    return res.status(400).json({ error: "Pick a leave type" });
+  }
+  if (merged.onLeave === true && (fields.loginTime !== undefined || fields.logoutTime !== undefined || fields.plan !== undefined || fields.remarks !== undefined || fields.rating !== undefined)) {
+    return res.status(400).json({ error: "You're marked on leave for this day - cancel the leave first" });
+  }
   if (fields.plan !== undefined && !merged.loginTime) {
     return res.status(400).json({ error: "Mark your attendance first" });
   }
@@ -363,6 +385,9 @@ app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
 // ---------- Pipeline (monthly lead/closure progress per person) ----------
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const MAX_CLIENTS = 100;
+const CLIENT_TYPES = ["family", "bachelor", "staff_sharing", "family_sharing"];
+const CLIENT_FIELD_LIMITS = { name: 100, looking: 500, budget: 100, locations: 300, remark: 1000 };
 const PIPELINE_METRICS = {
   leadsReceived: "Leads received",
   clientsInProcess: "Clients in process",
@@ -377,6 +402,7 @@ app.get("/api/tracker/pipeline/:month", auth.requireAuth, async (req, res) => {
   if (entry) return res.json(entry);
   const empty = { userId, month: req.params.month };
   for (const key of Object.keys(PIPELINE_METRICS)) { empty[key] = null; empty[`${key}Remark`] = ""; }
+  empty.clientDetails = [];
   res.json(empty);
 });
 
@@ -398,6 +424,21 @@ app.put("/api/tracker/pipeline/:month", auth.requireAuth, async (req, res) => {
       }
     }
     if (req.body[`${key}Remark`] !== undefined) fields[`${key}Remark`] = String(req.body[`${key}Remark`]).slice(0, 1000);
+  }
+  // One details card per client in process (index = client number - 1); blank entries keep the positions aligned.
+  if (req.body.clientDetails !== undefined) {
+    const list = req.body.clientDetails;
+    if (!Array.isArray(list)) return res.status(400).json({ error: "Client details must be a list" });
+    const clients = [];
+    for (const item of list.slice(0, MAX_CLIENTS)) {
+      const c = item && typeof item === "object" ? item : {};
+      const type = c.type === undefined || c.type === null ? "" : String(c.type);
+      if (type !== "" && !CLIENT_TYPES.includes(type)) return res.status(400).json({ error: "Invalid client type" });
+      const client = { type };
+      for (const [field, max] of Object.entries(CLIENT_FIELD_LIMITS)) client[field] = String(c[field] ?? "").slice(0, max);
+      clients.push(client);
+    }
+    fields.clientDetails = clients;
   }
   const entry = await db.upsertPipeline(req.user.userId, req.params.month, fields);
   res.json(entry);

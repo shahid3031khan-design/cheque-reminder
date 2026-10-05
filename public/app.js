@@ -18,6 +18,8 @@ const state = {
   trackerPendingRating: null,
   trackerTab: "daily",
   pipelineEntry: null,
+  pipelineClientDetails: [],
+  pipelineOpenClients: new Set(),
   tasks: [],
   taskEmployees: [],
   taskEmployeesLoaded: false,
@@ -624,14 +626,19 @@ function renderTrackerCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const entry = entryByDate[dateStr];
-    const hasEntry = !!(entry && (entry.loginTime || entry.plan || entry.remarks || entry.rating));
+    const hasEntry = !!(entry && (entry.loginTime || entry.plan || entry.remarks || entry.rating || entry.onLeave));
     const classes = ["tracker-cal-day"];
     if (dateStr === today) classes.push("is-today");
     if (dateStr === state.trackerSelectedDate) classes.push("is-selected");
     if (entry && entry.rating) classes.push(`rating-${entry.rating}`);
+    if (entry && entry.onLeave) classes.push("on-leave");
     cells += `<button type="button" class="${classes.join(" ")}" data-date="${dateStr}">${d}${hasEntry ? '<span class="entry-dot"></span>' : ""}</button>`;
   }
   $("#trackerCalGrid").innerHTML = cells;
+
+  const leaveDays = state.trackerMonthEntries.filter((e) => e.onLeave).length;
+  $("#trackerLeaveSummary").textContent = leaveDays ? `${leaveDays} day${leaveDays === 1 ? "" : "s"} on leave this month` : "";
+  $("#trackerLeaveSummary").classList.toggle("hidden", !leaveDays);
 }
 
 $("#trackerCalGrid").addEventListener("click", async (e) => {
@@ -692,9 +699,11 @@ function renderTrackerSteps() {
   const hasLogin = !!entry.loginTime;
   const hasPlan = !!String(entry.plan || "").trim();
   const hasRemarks = !!String(entry.remarks || "").trim();
+  const onLeave = !!entry.onLeave;
+  const leaveNote = "On leave - nothing to log";
 
   const loginLocked = !readOnly && future;
-  const planLocked = !readOnly && (future || !hasLogin);
+  const planLocked = !readOnly && (future || onLeave || !hasLogin);
   const remarksLocked = !readOnly && (planLocked || !hasPlan);
   const logoutLocked = !readOnly && (remarksLocked || !hasRemarks);
 
@@ -703,9 +712,20 @@ function renderTrackerSteps() {
     $(lockId).textContent = locked ? note : "";
   };
   setSection("#trackerLoginSection", "#trackerLoginLock", loginLocked, "Can't mark attendance for a future date");
-  setSection("#trackerPlanSection", "#trackerPlanLock", planLocked, "Mark attendance to unlock");
-  setSection("#trackerRemarksSection", "#trackerRemarksLock", remarksLocked, "Save your morning plan to unlock");
-  setSection("#trackerLogoutSection", "#trackerLogoutLock", logoutLocked, "Save your evening plan to unlock");
+  setSection("#trackerPlanSection", "#trackerPlanLock", planLocked, onLeave ? leaveNote : "Mark attendance to unlock");
+  setSection("#trackerRemarksSection", "#trackerRemarksLock", remarksLocked, onLeave ? leaveNote : "Save your morning plan to unlock");
+  setSection("#trackerLogoutSection", "#trackerLogoutLock", logoutLocked, onLeave ? leaveNote : "Save your evening plan to unlock");
+
+  // Leave days replace the login row with a leave card; attendance and leave are mutually exclusive.
+  $("#trackerLoginRowWrap").classList.toggle("hidden", onLeave);
+  $("#trackerLeaveCard").classList.toggle("hidden", !onLeave);
+  $("#trackerLeaveBtn").classList.toggle("hidden", readOnly || onLeave || hasLogin);
+  $("#trackerLeaveEditBtn").classList.toggle("hidden", readOnly);
+  $("#trackerLeaveCancelBtn").classList.toggle("hidden", readOnly);
+  if (onLeave) {
+    $("#trackerLeaveTitle").textContent = `On leave · ${leaveTypeLabel(entry.leaveType)}`;
+    $("#trackerLeaveReason").textContent = entry.leaveReason || "";
+  }
 
   renderTrackerTimeRow("#trackerLoginDisplay", "#trackerLoginBtn", entry.loginTime, "Mark attendance", loginLocked, readOnly);
   renderTrackerTimeRow("#trackerLogoutDisplay", "#trackerLogoutBtn", entry.logoutTime, "Mark logout", logoutLocked, readOnly);
@@ -761,6 +781,7 @@ function openClockModal(field) {
   $("#clockSubtitle").textContent = $("#trackerSelectedDateLabel").textContent;
   $("#clockTimeInput").value = saved || nowHHMM();
   $("#clockSaveBtn").textContent = saved ? "Save time" : step.button;
+  $("#clockLeaveBtn").classList.toggle("hidden", field !== "loginTime" || !!saved);
   $("#clockStatus").textContent = "";
   updateClockHands($("#clockTimeInput").value);
   $("#clockModal").classList.remove("hidden");
@@ -773,7 +794,7 @@ function closeClockModal() {
 
 function promptAttendanceIfNeeded() {
   const entry = state.trackerCurrentEntry || {};
-  if (!isViewingOwnTracker() || state.trackerSelectedDate > todayStr() || entry.loginTime) return;
+  if (!isViewingOwnTracker() || state.trackerSelectedDate > todayStr() || entry.loginTime || entry.onLeave) return;
   openClockModal("loginTime");
 }
 
@@ -804,6 +825,70 @@ $("#clockSaveBtn").addEventListener("click", async () => {
 $("#trackerLoginBtn").addEventListener("click", () => openClockModal("loginTime"));
 $("#trackerLogoutBtn").addEventListener("click", () => openClockModal("logoutTime"));
 
+// ---------- On leave ----------
+
+const LEAVE_TYPES = [
+  { value: "sick", label: "Sick leave" },
+  { value: "annual", label: "Annual leave" },
+  { value: "casual", label: "Casual leave" },
+  { value: "other", label: "Other" },
+];
+
+function leaveTypeLabel(value) {
+  return LEAVE_TYPES.find((t) => t.value === value)?.label || "Leave";
+}
+
+function openLeaveModal() {
+  const entry = state.trackerCurrentEntry || {};
+  $("#leaveSubtitle").textContent = $("#trackerSelectedDateLabel").textContent;
+  $("#leaveTypeSelect").value = entry.leaveType || "";
+  $("#leaveReasonInput").value = entry.leaveReason || "";
+  $("#leaveSaveBtn").textContent = entry.onLeave ? "Save leave" : "Mark on leave";
+  $("#leaveStatus").textContent = "";
+  $("#leaveModal").classList.remove("hidden");
+}
+
+function closeLeaveModal() { $("#leaveModal").classList.add("hidden"); }
+
+// Resolves to null on success, or the error message to show.
+async function saveTrackerLeave(body) {
+  try {
+    state.trackerCurrentEntry = await api(`/api/tracker/entries/${state.trackerSelectedDate}`, { method: "PUT", body: JSON.stringify(body) });
+    await loadTrackerMonthEntries();
+    renderTrackerCalendar();
+    renderTrackerSteps();
+    return null;
+  } catch (err) {
+    return err.message || "Couldn't save.";
+  }
+}
+
+$("#trackerLeaveBtn").addEventListener("click", openLeaveModal);
+$("#trackerLeaveEditBtn").addEventListener("click", openLeaveModal);
+$("#clockLeaveBtn").addEventListener("click", () => { closeClockModal(); openLeaveModal(); });
+$("#closeLeaveBtn").addEventListener("click", closeLeaveModal);
+$("#leaveModal").addEventListener("click", (e) => {
+  if (e.target.id === "leaveModal") closeLeaveModal();
+});
+
+$("#leaveForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const leaveType = $("#leaveTypeSelect").value;
+  if (!leaveType) { $("#leaveStatus").textContent = "Pick a leave type."; return; }
+  $("#leaveStatus").textContent = "Saving...";
+  const error = await saveTrackerLeave({ onLeave: true, leaveType, leaveReason: $("#leaveReasonInput").value });
+  if (error) $("#leaveStatus").textContent = error; else closeLeaveModal();
+});
+
+$("#trackerLeaveCancelBtn").addEventListener("click", async () => {
+  $("#trackerLeaveTitle").textContent = "Cancelling...";
+  const error = await saveTrackerLeave({ onLeave: false });
+  if (error) {
+    renderTrackerSteps();
+    $("#trackerLeaveReason").textContent = error;
+  }
+});
+
 // ---------- Pipeline (monthly progress per person) ----------
 
 const PIPELINE_METRICS = [
@@ -830,6 +915,7 @@ function renderPipelineForm() {
         <input type="number" id="pipeline-${m.key}" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="${m.label}">
       </div>
       <textarea id="pipeline-${m.key}Remark" rows="2" maxlength="1000" placeholder="Add a remark..." aria-label="Remark for ${m.label}"></textarea>
+      ${m.key === "clientsInProcess" ? '<div class="pipeline-clients hidden" id="pipelineClients"></div>' : ""}
     </div>`).join("");
 }
 
@@ -844,13 +930,124 @@ function fillPipelineForm() {
     count.disabled = readOnly;
     remark.disabled = readOnly;
   });
+  state.pipelineClientDetails = Array.isArray(entry.clientDetails)
+    ? entry.clientDetails.map((c) => (c && typeof c === "object" ? { ...c } : {}))
+    : [];
+  renderClientDetails();
   $("#pipelineSaveBtn").classList.toggle("hidden", readOnly);
   $("#pipelineStatus").textContent = "";
 }
 
+// "Clients in process" expands into one details card per client (Client 1, Client 2, ...).
+const MAX_CLIENTS = 100;
+const CLIENT_TYPES = [
+  { value: "family", label: "Family" },
+  { value: "bachelor", label: "Bachelor" },
+  { value: "staff_sharing", label: "Staff sharing" },
+  { value: "family_sharing", label: "Family sharing" },
+];
+const CLIENT_FIELDS = ["name", "looking", "budget", "locations", "type", "remark"];
+
+function clientCount() {
+  const n = parseInt($("#pipeline-clientsInProcess").value, 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, MAX_CLIENTS) : 0;
+}
+
+function syncClientDetailsFromDom() {
+  document.querySelectorAll("#pipelineClients .pipeline-client").forEach((card, i) => {
+    const details = state.pipelineClientDetails[i] || {};
+    card.querySelectorAll("[data-field]").forEach((el) => { details[el.dataset.field] = el.value; });
+    state.pipelineClientDetails[i] = details;
+  });
+}
+
+const CHEVRON_SVG = '<svg class="pipeline-client-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
+// One-line summary shown on a collapsed client row: name · who it's for · budget.
+function updateClientSummary(card) {
+  const val = (f) => card.querySelector(`[data-field="${f}"]`).value.trim();
+  const typeLabel = CLIENT_TYPES.find((t) => t.value === val("type"))?.label || "";
+  card.querySelector(".pipeline-client-sub").textContent = [val("name"), typeLabel, val("budget")].filter(Boolean).join(" · ") || "Tap to add details";
+}
+
+function renderClientDetails() {
+  const count = clientCount();
+  const readOnly = !isViewingOwnTracker();
+  const box = $("#pipelineClients");
+  box.classList.toggle("hidden", count === 0);
+  if (count === 0) { box.innerHTML = ""; return; }
+  const typeOptions = `<option value="">Select...</option>` + CLIENT_TYPES.map((t) => `<option value="${t.value}">${t.label}</option>`).join("");
+  box.innerHTML = `<div class="pipeline-clients-title">Client details</div>` +
+    Array.from({ length: count }, (_, i) => `
+      <details class="pipeline-client"${state.pipelineOpenClients.has(i) ? " open" : ""}>
+        <summary class="pipeline-client-head">
+          <div class="pipeline-client-titles">
+            <span class="pipeline-client-label">Client ${i + 1}</span>
+            <span class="pipeline-client-sub"></span>
+          </div>
+          ${CHEVRON_SVG}
+        </summary>
+        <div class="pipeline-client-body">
+        <div class="pipeline-field">
+          <span class="pipeline-field-label">Client name</span>
+          <input type="text" data-field="name" maxlength="100" placeholder="e.g. Mr. Ahmed" aria-label="Client ${i + 1} name">
+        </div>
+        <div class="pipeline-field">
+          <span class="pipeline-field-label">Looking for</span>
+          <textarea rows="2" data-field="looking" maxlength="500" placeholder="e.g. 2BR apartment, close to the metro" aria-label="What client ${i + 1} is looking for"></textarea>
+        </div>
+        <div class="pipeline-field-row">
+          <div class="pipeline-field">
+            <span class="pipeline-field-label">Budget</span>
+            <input type="text" data-field="budget" maxlength="100" placeholder="e.g. AED 90k / year" aria-label="Client ${i + 1} budget">
+          </div>
+          <div class="pipeline-field">
+            <span class="pipeline-field-label">For</span>
+            <select data-field="type" aria-label="Client ${i + 1} is looking for">${typeOptions}</select>
+          </div>
+        </div>
+        <div class="pipeline-field">
+          <span class="pipeline-field-label">Preferred locations</span>
+          <input type="text" data-field="locations" maxlength="300" placeholder="e.g. Marina, JVC, Business Bay" aria-label="Client ${i + 1} preferred locations">
+        </div>
+        <div class="pipeline-field">
+          <span class="pipeline-field-label">Remark</span>
+          <textarea rows="2" data-field="remark" maxlength="1000" placeholder="Remark for client ${i + 1}..." aria-label="Remark for client ${i + 1}"></textarea>
+        </div>
+        </div>
+      </details>`).join("");
+  box.querySelectorAll(".pipeline-client").forEach((card, i) => {
+    const details = state.pipelineClientDetails[i] || {};
+    card.querySelectorAll("[data-field]").forEach((el) => {
+      el.value = details[el.dataset.field] || "";
+      el.disabled = readOnly;
+    });
+    updateClientSummary(card);
+  });
+}
+
+$("#pipelineMetrics").addEventListener("input", (e) => {
+  if (e.target.id === "pipeline-clientsInProcess") {
+    syncClientDetailsFromDom();
+    renderClientDetails();
+    return;
+  }
+  const card = e.target.closest(".pipeline-client");
+  if (card && ["name", "type", "budget"].includes(e.target.dataset.field)) updateClientSummary(card);
+});
+
+// Remember which client rows are expanded across re-renders (toggle doesn't bubble, so listen in the capture phase).
+$("#pipelineMetrics").addEventListener("toggle", (e) => {
+  const card = e.target;
+  if (!card.classList || !card.classList.contains("pipeline-client")) return;
+  const index = [...card.parentElement.querySelectorAll(".pipeline-client")].indexOf(card);
+  if (card.open) state.pipelineOpenClients.add(index); else state.pipelineOpenClients.delete(index);
+}, true);
+
 async function loadPipeline() {
   const uid = trackerUserIdParam();
   state.pipelineEntry = await api(`/api/tracker/pipeline/${trackerMonthKey()}${uid ? `?userId=${encodeURIComponent(uid)}` : ""}`);
+  state.pipelineOpenClients = new Set();
   fillPipelineForm();
 }
 
@@ -873,6 +1070,11 @@ $("#pipelineForm").addEventListener("submit", async (e) => {
     const raw = $(`#pipeline-${m.key}`).value.trim();
     body[m.key] = raw === "" ? null : Number(raw);
     body[`${m.key}Remark`] = $(`#pipeline-${m.key}Remark`).value;
+  });
+  syncClientDetailsFromDom();
+  body.clientDetails = Array.from({ length: clientCount() }, (_, i) => {
+    const details = state.pipelineClientDetails[i] || {};
+    return Object.fromEntries(CLIENT_FIELDS.map((f) => [f, details[f] || ""]));
   });
   $("#pipelineStatus").textContent = "Saving...";
   try {

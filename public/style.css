@@ -598,6 +598,18 @@ select {
   color: var(--text);
 }
 
+#leaveForm textarea {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  resize: vertical;
+}
+#leaveForm textarea:focus { outline: none; border-color: var(--yellow); }
+
 .full-width { width: 100%; }
 .center { text-align: center; }
 .eyebrow.center { margin-top: 4px; }
@@ -990,6 +1002,8 @@ select {
 .tracker-cal-day.rating-4 { background: hsl(140, 50%, 48%); color: #0e1a12; }
 .tracker-cal-day.rating-5 { background: hsl(140, 60%, 56%); color: #0e1a12; }
 .tracker-cal-day[class*="rating-"] .entry-dot { display: none; }
+.tracker-cal-day.on-leave { background: hsl(38, 100%, 89%); color: hsl(28, 75%, 28%); }
+.tracker-cal-day.on-leave .entry-dot { display: none; }
 
 .tracker-cal-day.is-selected { background: var(--yellow); color: var(--yellow-text); }
 .tracker-cal-day.is-selected .entry-dot { background: var(--yellow-text); }
@@ -1109,6 +1123,30 @@ select {
 }
 .tracker-lock-overlay svg { width: 30px; height: 30px; color: var(--yellow-dark); }
 .tracker-section.is-locked .tracker-lock-overlay { display: flex; }
+.tracker-lockable { position: relative; }
+
+/* On leave: a day is either worked or a leave day */
+.tracker-leave-btn { margin-top: 10px; }
+.tracker-leave-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid hsl(35, 85%, 76%);
+  background: hsl(38, 100%, 94%);
+  color: hsl(28, 70%, 26%);
+}
+.tracker-leave-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tracker-leave-title { font-size: 0.9rem; font-weight: 800; }
+.tracker-leave-reason { font-size: 0.78rem; overflow-wrap: anywhere; }
+.tracker-leave-reason:empty { display: none; }
+.tracker-leave-actions { display: flex; gap: 8px; }
+.tracker-leave-actions button { padding: 8px 12px; font-size: 0.78rem; }
+.tracker-leave-summary { margin: 10px 0 0; text-align: center; font-size: 0.75rem; font-weight: 700; color: hsl(28, 70%, 34%); }
+.clock-leave-btn { margin-top: 8px; }
 
 /* Clock popup used for login / logout time */
 .clock-sheet { text-align: center; }
@@ -1179,6 +1217,69 @@ select {
 .pipeline-metric-head input[type="number"]:focus { outline: none; border-color: var(--yellow); }
 .pipeline-metric-head input[type="number"]:disabled { opacity: 0.65; }
 .pipeline-metric textarea { margin-bottom: 0; }
+
+/* Sub-category under "Clients in process": one remark per client */
+.pipeline-clients { margin-top: 14px; padding-left: 12px; border-left: 3px solid var(--icon-purple-bg); }
+.pipeline-clients-title {
+  margin-bottom: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+.pipeline-client {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.pipeline-client:last-child { margin-bottom: 0; }
+.pipeline-client-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.pipeline-client-head::-webkit-details-marker { display: none; }
+.pipeline-client-titles { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pipeline-client-label { font-size: 0.9rem; font-weight: 800; }
+.pipeline-client-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipeline-client-chevron { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); transition: transform 0.2s ease; }
+.pipeline-client[open] .pipeline-client-chevron { transform: rotate(180deg); }
+.pipeline-client[open] > .pipeline-client-head { border-bottom: 1px solid var(--border); }
+.pipeline-client-body { padding: 12px; }
+.pipeline-field { margin-bottom: 10px; min-width: 0; }
+.pipeline-client-body > .pipeline-field:last-child { margin-bottom: 0; }
+.pipeline-field-row { display: grid; grid-template-columns: 1fr; column-gap: 10px; }
+@media (min-width: 520px) { .pipeline-field-row { grid-template-columns: 1fr 1fr; } }
+.pipeline-field-label { display: block; margin-bottom: 4px; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
+.pipeline-field input[type="text"],
+.pipeline-field select {
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+.pipeline-field input[type="text"]:focus,
+.pipeline-field select:focus { outline: none; border-color: var(--yellow); }
+.pipeline-field input:disabled,
+.pipeline-field select:disabled { opacity: 0.65; }
 
 /* ---------- Tasks ---------- */
 

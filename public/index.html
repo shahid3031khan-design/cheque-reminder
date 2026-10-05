@@ -150,6 +150,7 @@
         <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
       </div>
       <div class="tracker-cal-grid" id="trackerCalGrid"></div>
+      <p class="tracker-leave-summary hidden" id="trackerLeaveSummary"></p>
     </div>
 
     <div class="tracker-day-panel" id="trackerDayPanel">
@@ -157,11 +158,24 @@
 
       <div class="tracker-section" id="trackerLoginSection">
         <label class="tracker-section-label">Attendance <span class="tracker-time-tag">Login</span></label>
+        <div class="tracker-lockable" id="trackerLoginRowWrap">
         <div class="tracker-time-row">
           <div class="tracker-time-display" id="trackerLoginDisplay">Not marked</div>
           <button type="button" id="trackerLoginBtn" class="primary">Mark attendance</button>
         </div>
         <div class="tracker-lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="trackerLoginLock"></span></div>
+        </div>
+        <button type="button" id="trackerLeaveBtn" class="tracker-leave-btn secondary full-width">On leave</button>
+        <div class="tracker-leave-card hidden" id="trackerLeaveCard">
+          <div class="tracker-leave-info">
+            <span class="tracker-leave-title" id="trackerLeaveTitle">On leave</span>
+            <span class="tracker-leave-reason" id="trackerLeaveReason"></span>
+          </div>
+          <div class="tracker-leave-actions">
+            <button type="button" id="trackerLeaveEditBtn" class="secondary">Edit</button>
+            <button type="button" id="trackerLeaveCancelBtn" class="secondary">Cancel leave</button>
+          </div>
+        </div>
       </div>
 
       <div class="tracker-section" id="trackerPlanSection">
@@ -292,7 +306,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v24</div>
+<div id="appVersion" class="app-version hidden">v28</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -535,6 +549,34 @@
     <input type="time" id="clockTimeInput" class="clock-time-input">
     <p id="clockStatus" class="hint"></p>
     <button type="button" id="clockSaveBtn" class="primary full-width">Mark attendance</button>
+    <button type="button" id="clockLeaveBtn" class="secondary full-width clock-leave-btn hidden">I'm on leave instead</button>
+  </div>
+</div>
+
+<div id="leaveModal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2>Mark on leave</h2>
+      <button id="closeLeaveBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <p class="hint" id="leaveSubtitle"></p>
+    <form id="leaveForm">
+      <label>Leave type
+        <select id="leaveTypeSelect">
+          <option value="">Select...</option>
+          <option value="sick">Sick leave</option>
+          <option value="annual">Annual leave</option>
+          <option value="casual">Casual leave</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Reason (optional)
+        <textarea id="leaveReasonInput" rows="3" maxlength="500" placeholder="e.g. Doctor's appointment"></textarea>
+      </label>
+      <p id="leaveStatus" class="hint"></p>
+      <button type="submit" id="leaveSaveBtn" class="primary full-width">Mark on leave</button>
+    </form>
   </div>
 </div>
 
