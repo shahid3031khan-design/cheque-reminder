@@ -290,6 +290,7 @@ app.put("/api/config", auth.requireAdmin, async (req, res) => {
 // ---------- Tracker (daily employee work log) ----------
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function resolveTrackerUserId(req) {
   // Employees can only ever see their own tracker; admins may view anyone's via ?userId=
@@ -303,7 +304,7 @@ app.get("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
   if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
   const userId = resolveTrackerUserId(req);
   const entry = await db.getTrackerEntry(userId, req.params.date);
-  res.json(entry || { userId, date: req.params.date, plan: "", remarks: "", rating: null });
+  res.json(entry || { userId, date: req.params.date, loginTime: "", plan: "", remarks: "", rating: null, logoutTime: "" });
 });
 
 app.get("/api/tracker/month", auth.requireAuth, async (req, res) => {
@@ -319,6 +320,12 @@ app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
   if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
   // Always the logged-in user's own entry - admins can view others' tracker but not edit them.
   const fields = {};
+  for (const [key, label] of [["loginTime", "login"], ["logoutTime", "logout"]]) {
+    if (req.body[key] === undefined) continue;
+    const value = String(req.body[key]);
+    if (!TIME_RE.test(value)) return res.status(400).json({ error: `Invalid ${label} time` });
+    fields[key] = value;
+  }
   if (req.body.plan !== undefined) fields.plan = String(req.body.plan).slice(0, 5000);
   if (req.body.remarks !== undefined) fields.remarks = String(req.body.remarks).slice(0, 5000);
   if (req.body.rating !== undefined) {
@@ -332,6 +339,23 @@ app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
       fields.rating = rating;
     }
   }
+
+  // Each step of the day unlocks the next: attendance -> morning plan -> evening plan -> logout.
+  const existing = await db.getTrackerEntry(req.user.userId, req.params.date);
+  const merged = { ...(existing || {}), ...fields };
+  if (fields.plan !== undefined && !merged.loginTime) {
+    return res.status(400).json({ error: "Mark your attendance first" });
+  }
+  if ((fields.remarks !== undefined || fields.rating !== undefined) && !String(merged.plan || "").trim()) {
+    return res.status(400).json({ error: "Save your morning plan first" });
+  }
+  if (fields.logoutTime !== undefined && !String(merged.remarks || "").trim()) {
+    return res.status(400).json({ error: "Save your evening plan first" });
+  }
+  if ((fields.loginTime !== undefined || fields.logoutTime !== undefined) && merged.loginTime && merged.logoutTime && merged.logoutTime <= merged.loginTime) {
+    return res.status(400).json({ error: "Logout time must be after login time" });
+  }
+
   const entry = await db.upsertTrackerEntry(req.user.userId, req.params.date, fields);
   res.json(entry);
 });

@@ -619,7 +619,7 @@ function renderTrackerCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const entry = entryByDate[dateStr];
-    const hasEntry = !!(entry && (entry.plan || entry.remarks || entry.rating));
+    const hasEntry = !!(entry && (entry.loginTime || entry.plan || entry.remarks || entry.rating));
     const classes = ["tracker-cal-day"];
     if (dateStr === today) classes.push("is-today");
     if (dateStr === state.trackerSelectedDate) classes.push("is-selected");
@@ -633,6 +633,8 @@ $("#trackerCalGrid").addEventListener("click", async (e) => {
   const btn = e.target.closest(".tracker-cal-day[data-date]");
   if (!btn) return;
   await selectTrackerDay(btn.dataset.date);
+  $("#trackerDayPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  promptAttendanceIfNeeded();
 });
 
 $("#trackerPrevMonth").addEventListener("click", async () => {
@@ -664,17 +666,137 @@ async function selectTrackerDay(dateStr) {
   const entry = await api(`/api/tracker/entries/${dateStr}${uid ? `?userId=${encodeURIComponent(uid)}` : ""}`);
   state.trackerCurrentEntry = entry;
 
-  const readOnly = !isViewingOwnTracker();
   $("#trackerPlanInput").value = entry.plan || "";
-  $("#trackerPlanInput").disabled = readOnly;
   $("#trackerRemarksInput").value = entry.remarks || "";
-  $("#trackerRemarksInput").disabled = readOnly;
-  $("#trackerSavePlanBtn").classList.toggle("hidden", readOnly);
-  $("#trackerSaveRemarksBtn").classList.toggle("hidden", readOnly);
-  $("#trackerPlanStatus").textContent = "";
-  $("#trackerRemarksStatus").textContent = "";
-  renderTrackerRatingStars(entry.rating, readOnly);
+  ["#trackerPlanStatus", "#trackerRemarksStatus"].forEach((sel) => { $(sel).textContent = ""; });
+  renderTrackerSteps();
 }
+
+function nowHHMM() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Day flow: attendance -> morning plan -> evening plan -> logout. Each step stays locked
+// until the one before it has been saved (the server enforces the same order).
+function renderTrackerSteps() {
+  const entry = state.trackerCurrentEntry || {};
+  const readOnly = !isViewingOwnTracker();
+  const future = state.trackerSelectedDate > todayStr();
+  const hasLogin = !!entry.loginTime;
+  const hasPlan = !!String(entry.plan || "").trim();
+  const hasRemarks = !!String(entry.remarks || "").trim();
+
+  const loginLocked = !readOnly && future;
+  const planLocked = !readOnly && (future || !hasLogin);
+  const remarksLocked = !readOnly && (planLocked || !hasPlan);
+  const logoutLocked = !readOnly && (remarksLocked || !hasRemarks);
+
+  const setSection = (id, lockId, locked, note) => {
+    $(id).classList.toggle("is-locked", locked);
+    $(lockId).textContent = locked ? note : "";
+  };
+  setSection("#trackerLoginSection", "#trackerLoginLock", loginLocked, "Can't mark attendance for a future date");
+  setSection("#trackerPlanSection", "#trackerPlanLock", planLocked, "Mark attendance to unlock");
+  setSection("#trackerRemarksSection", "#trackerRemarksLock", remarksLocked, "Save your morning plan to unlock");
+  setSection("#trackerLogoutSection", "#trackerLogoutLock", logoutLocked, "Save your evening plan to unlock");
+
+  renderTrackerTimeRow("#trackerLoginDisplay", "#trackerLoginBtn", entry.loginTime, "Mark attendance", loginLocked, readOnly);
+  renderTrackerTimeRow("#trackerLogoutDisplay", "#trackerLogoutBtn", entry.logoutTime, "Mark logout", logoutLocked, readOnly);
+
+  $("#trackerPlanInput").disabled = readOnly || planLocked;
+  $("#trackerSavePlanBtn").classList.toggle("hidden", readOnly);
+  $("#trackerSavePlanBtn").disabled = planLocked;
+  $("#trackerRemarksInput").disabled = readOnly || remarksLocked;
+  $("#trackerSaveRemarksBtn").classList.toggle("hidden", readOnly);
+  $("#trackerSaveRemarksBtn").disabled = remarksLocked;
+  renderTrackerRatingStars(entry.rating, readOnly || remarksLocked);
+}
+
+function formatClockTime(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function renderTrackerTimeRow(displaySel, btnSel, savedTime, markLabel, locked, readOnly) {
+  const display = $(displaySel), btn = $(btnSel);
+  display.textContent = savedTime ? formatClockTime(savedTime) : "Not marked";
+  display.classList.toggle("is-empty", !savedTime);
+  btn.classList.toggle("hidden", readOnly);
+  btn.disabled = locked;
+  btn.textContent = savedTime ? "Edit" : markLabel;
+  btn.classList.toggle("primary", !savedTime);
+  btn.classList.toggle("secondary", !!savedTime);
+}
+
+function revealTrackerSection(sectionSel) {
+  $(sectionSel).scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// ---------- Clock popup (login / logout time) ----------
+
+const CLOCK_STEPS = {
+  loginTime: { title: "Mark attendance", button: "Mark attendance" },
+  logoutTime: { title: "Mark logout", button: "Mark logout" },
+};
+let clockField = null;
+
+function updateClockHands(hhmm) {
+  const [h, m] = (hhmm || "00:00").split(":").map(Number);
+  $("#clockHourHand").setAttribute("transform", `rotate(${((h % 12) + m / 60) * 30} 50 50)`);
+  $("#clockMinuteHand").setAttribute("transform", `rotate(${m * 6} 50 50)`);
+}
+
+function openClockModal(field) {
+  const step = CLOCK_STEPS[field];
+  const saved = state.trackerCurrentEntry?.[field];
+  clockField = field;
+  $("#clockTitle").textContent = step.title;
+  $("#clockSubtitle").textContent = $("#trackerSelectedDateLabel").textContent;
+  $("#clockTimeInput").value = saved || nowHHMM();
+  $("#clockSaveBtn").textContent = saved ? "Save time" : step.button;
+  $("#clockStatus").textContent = "";
+  updateClockHands($("#clockTimeInput").value);
+  $("#clockModal").classList.remove("hidden");
+}
+
+function closeClockModal() {
+  $("#clockModal").classList.add("hidden");
+  clockField = null;
+}
+
+function promptAttendanceIfNeeded() {
+  const entry = state.trackerCurrentEntry || {};
+  if (!isViewingOwnTracker() || state.trackerSelectedDate > todayStr() || entry.loginTime) return;
+  openClockModal("loginTime");
+}
+
+$("#clockTimeInput").addEventListener("input", (e) => updateClockHands(e.target.value));
+$("#closeClockBtn").addEventListener("click", closeClockModal);
+$("#clockModal").addEventListener("click", (e) => {
+  if (e.target.id === "clockModal") closeClockModal();
+});
+
+$("#clockSaveBtn").addEventListener("click", async () => {
+  const value = $("#clockTimeInput").value;
+  if (!value) { $("#clockStatus").textContent = "Pick a time first."; return; }
+  const field = clockField;
+  const hadLogin = !!state.trackerCurrentEntry?.loginTime;
+  $("#clockStatus").textContent = "Saving...";
+  try {
+    state.trackerCurrentEntry = await api(`/api/tracker/entries/${state.trackerSelectedDate}`, { method: "PUT", body: JSON.stringify({ [field]: value }) });
+    closeClockModal();
+    await loadTrackerMonthEntries();
+    renderTrackerCalendar();
+    renderTrackerSteps();
+    if (field === "loginTime" && !hadLogin) revealTrackerSection("#trackerPlanSection");
+  } catch (err) {
+    $("#clockStatus").textContent = err.message;
+  }
+});
+
+$("#trackerLoginBtn").addEventListener("click", () => openClockModal("loginTime"));
+$("#trackerLogoutBtn").addEventListener("click", () => openClockModal("logoutTime"));
 
 function renderTrackerRatingStars(rating, readOnly) {
   const starIcon = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><polygon points="12 2.5 15.1 9 22 10 17 15 18.2 22 12 18.6 5.8 22 7 15 2 10 8.9 9"/></svg>';
@@ -692,6 +814,7 @@ $("#trackerRatingStars").addEventListener("click", (e) => {
 
 $("#trackerSavePlanBtn").addEventListener("click", async () => {
   const dateStr = state.trackerSelectedDate;
+  const hadPlan = !!String(state.trackerCurrentEntry?.plan || "").trim();
   $("#trackerPlanStatus").textContent = "Saving...";
   try {
     const entry = await api(`/api/tracker/entries/${dateStr}`, { method: "PUT", body: JSON.stringify({ plan: $("#trackerPlanInput").value }) });
@@ -699,6 +822,8 @@ $("#trackerSavePlanBtn").addEventListener("click", async () => {
     $("#trackerPlanStatus").textContent = "Saved.";
     await loadTrackerMonthEntries();
     renderTrackerCalendar();
+    renderTrackerSteps();
+    if (!hadPlan && String(entry.plan || "").trim()) revealTrackerSection("#trackerRemarksSection");
   } catch (err) {
     $("#trackerPlanStatus").textContent = err.message;
   }
@@ -708,6 +833,7 @@ $("#trackerSavePlanBtn").addEventListener("click", async () => {
 $("#trackerSaveRemarksBtn").addEventListener("click", async () => {
   const dateStr = state.trackerSelectedDate;
   const rating = state.trackerPendingRating !== null ? state.trackerPendingRating : (state.trackerCurrentEntry?.rating ?? null);
+  const hadRemarks = !!String(state.trackerCurrentEntry?.remarks || "").trim();
   $("#trackerRemarksStatus").textContent = "Saving...";
   try {
     const entry = await api(`/api/tracker/entries/${dateStr}`, { method: "PUT", body: JSON.stringify({ remarks: $("#trackerRemarksInput").value, rating }) });
@@ -716,6 +842,8 @@ $("#trackerSaveRemarksBtn").addEventListener("click", async () => {
     $("#trackerRemarksStatus").textContent = "Saved.";
     await loadTrackerMonthEntries();
     renderTrackerCalendar();
+    renderTrackerSteps();
+    if (!hadRemarks && String(entry.remarks || "").trim() && !entry.logoutTime) openClockModal("logoutTime");
   } catch (err) {
     $("#trackerRemarksStatus").textContent = err.message;
   }

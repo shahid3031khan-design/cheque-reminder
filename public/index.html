@@ -146,23 +146,43 @@
       <div class="tracker-cal-grid" id="trackerCalGrid"></div>
     </div>
 
-    <div class="tracker-day-panel">
+    <div class="tracker-day-panel" id="trackerDayPanel">
       <h3 id="trackerSelectedDateLabel">Today</h3>
 
-      <div class="tracker-section">
+      <div class="tracker-section" id="trackerLoginSection">
+        <label class="tracker-section-label">Attendance <span class="tracker-time-tag">Login</span></label>
+        <div class="tracker-time-row">
+          <div class="tracker-time-display" id="trackerLoginDisplay">Not marked</div>
+          <button type="button" id="trackerLoginBtn" class="primary">Mark attendance</button>
+        </div>
+        <div class="tracker-lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="trackerLoginLock"></span></div>
+      </div>
+
+      <div class="tracker-section" id="trackerPlanSection">
         <label class="tracker-section-label">Today's plan / tasks <span class="tracker-time-tag">Morning</span></label>
         <textarea id="trackerPlanInput" rows="4" placeholder="What are you planning to work on today?"></textarea>
         <button type="button" id="trackerSavePlanBtn" class="secondary full-width">Save plan</button>
         <p id="trackerPlanStatus" class="hint"></p>
+        <div class="tracker-lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="trackerPlanLock"></span></div>
       </div>
 
-      <div class="tracker-section">
-        <label class="tracker-section-label">Remarks <span class="tracker-time-tag">Evening</span></label>
-        <textarea id="trackerRemarksInput" rows="4" placeholder="How did today go?"></textarea>
+      <div class="tracker-section" id="trackerRemarksSection">
+        <label class="tracker-section-label">Evening plan / remarks <span class="tracker-time-tag">Evening</span></label>
+        <textarea id="trackerRemarksInput" rows="4" placeholder="How did today go? What did you get done?"></textarea>
         <label class="tracker-section-label">Rate your day</label>
         <div class="tracker-rating" id="trackerRatingStars"></div>
-        <button type="button" id="trackerSaveRemarksBtn" class="primary full-width">Save remarks</button>
+        <button type="button" id="trackerSaveRemarksBtn" class="primary full-width">Save evening plan</button>
         <p id="trackerRemarksStatus" class="hint"></p>
+        <div class="tracker-lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="trackerRemarksLock"></span></div>
+      </div>
+
+      <div class="tracker-section" id="trackerLogoutSection">
+        <label class="tracker-section-label">Logout <span class="tracker-time-tag">Evening</span></label>
+        <div class="tracker-time-row">
+          <div class="tracker-time-display" id="trackerLogoutDisplay">Not marked</div>
+          <button type="button" id="trackerLogoutBtn" class="primary">Mark logout</button>
+        </div>
+        <div class="tracker-lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="trackerLogoutLock"></span></div>
       </div>
     </div>
   </div>
@@ -250,7 +270,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version">v1.41</div>
+<div id="appVersion" class="app-version">v1.51</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -457,6 +477,42 @@
       </div>
       <p id="notifStatus" class="hint"></p>
     </form>
+  </div>
+</div>
+
+<div id="clockModal" class="sheet-overlay hidden">
+  <div class="sheet clock-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2 id="clockTitle">Mark attendance</h2>
+      <button id="closeClockBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <p class="hint" id="clockSubtitle"></p>
+    <div class="clock-face">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="clock-ring" cx="50" cy="50" r="46"/>
+        <g class="clock-ticks">
+          <line x1="50" y1="7" x2="50" y2="13"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(30 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(60 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(90 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(120 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(150 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(180 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(210 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(240 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(270 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(300 50 50)"/>
+          <line x1="50" y1="7" x2="50" y2="13" transform="rotate(330 50 50)"/>
+        </g>
+        <line class="clock-hand clock-hand-hour" id="clockHourHand" x1="50" y1="50" x2="50" y2="28" stroke-width="3.2"/>
+        <line class="clock-hand clock-hand-minute" id="clockMinuteHand" x1="50" y1="50" x2="50" y2="17" stroke-width="2"/>
+        <circle class="clock-pin" cx="50" cy="50" r="3"/>
+      </svg>
+    </div>
+    <input type="time" id="clockTimeInput" class="clock-time-input">
+    <p id="clockStatus" class="hint"></p>
+    <button type="button" id="clockSaveBtn" class="primary full-width">Mark attendance</button>
   </div>
 </div>
 
