@@ -16,6 +16,8 @@ const state = {
   trackerCurrentEntry: null,
   trackerEmployeesLoaded: false,
   trackerPendingRating: null,
+  trackerTab: "daily",
+  pipelineEntry: null,
   tasks: [],
   taskEmployees: [],
   taskEmployeesLoaded: false,
@@ -576,6 +578,7 @@ async function openTrackerView() {
   await loadTrackerMonthEntries();
   renderTrackerCalendar();
   await selectTrackerDay(state.trackerSelectedDate);
+  if (state.trackerTab === "pipeline") await loadPipeline();
 }
 
 async function loadTrackerEmployeeOptions() {
@@ -592,6 +595,7 @@ $("#trackerEmployeeSelect").addEventListener("change", async (e) => {
   await loadTrackerMonthEntries();
   renderTrackerCalendar();
   await selectTrackerDay(state.trackerSelectedDate);
+  if (state.trackerTab === "pipeline") await loadPipeline();
 });
 
 async function loadTrackerMonthEntries() {
@@ -638,19 +642,20 @@ $("#trackerCalGrid").addEventListener("click", async (e) => {
   promptAttendanceIfNeeded();
 });
 
-$("#trackerPrevMonth").addEventListener("click", async () => {
-  state.trackerMonth -= 1;
+// Both Tracker tabs share one month, so the calendar and the pipeline never disagree.
+async function shiftTrackerMonth(delta) {
+  state.trackerMonth += delta;
   if (state.trackerMonth < 1) { state.trackerMonth = 12; state.trackerYear -= 1; }
-  await loadTrackerMonthEntries();
-  renderTrackerCalendar();
-});
-
-$("#trackerNextMonth").addEventListener("click", async () => {
-  state.trackerMonth += 1;
   if (state.trackerMonth > 12) { state.trackerMonth = 1; state.trackerYear += 1; }
   await loadTrackerMonthEntries();
   renderTrackerCalendar();
-});
+  if (state.trackerTab === "pipeline") await loadPipeline();
+}
+
+$("#trackerPrevMonth").addEventListener("click", () => shiftTrackerMonth(-1));
+$("#trackerNextMonth").addEventListener("click", () => shiftTrackerMonth(1));
+$("#pipelinePrevMonth").addEventListener("click", () => shiftTrackerMonth(-1));
+$("#pipelineNextMonth").addEventListener("click", () => shiftTrackerMonth(1));
 
 async function selectTrackerDay(dateStr) {
   state.trackerSelectedDate = dateStr;
@@ -798,6 +803,89 @@ $("#clockSaveBtn").addEventListener("click", async () => {
 
 $("#trackerLoginBtn").addEventListener("click", () => openClockModal("loginTime"));
 $("#trackerLogoutBtn").addEventListener("click", () => openClockModal("logoutTime"));
+
+// ---------- Pipeline (monthly progress per person) ----------
+
+const PIPELINE_METRICS = [
+  { key: "leadsReceived", label: "Leads received", badge: "badge-blue",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>' },
+  { key: "clientsInProcess", label: "Clients in process", badge: "badge-purple",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
+  { key: "expectedClosures", label: "Expected closures this month", badge: "badge-coral",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>' },
+  { key: "dealsClosed", label: "Deals closed this month", badge: "badge-mint",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' },
+];
+
+function trackerMonthKey() {
+  return `${state.trackerYear}-${String(state.trackerMonth).padStart(2, "0")}`;
+}
+
+function renderPipelineForm() {
+  $("#pipelineMetrics").innerHTML = PIPELINE_METRICS.map((m) => `
+    <div class="tracker-section pipeline-metric">
+      <div class="pipeline-metric-head">
+        <span class="stat-icon-badge ${m.badge}">${m.icon}</span>
+        <span class="pipeline-metric-title">${m.label}</span>
+        <input type="number" id="pipeline-${m.key}" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="${m.label}">
+      </div>
+      <textarea id="pipeline-${m.key}Remark" rows="2" maxlength="1000" placeholder="Add a remark..." aria-label="Remark for ${m.label}"></textarea>
+    </div>`).join("");
+}
+
+function fillPipelineForm() {
+  const entry = state.pipelineEntry || {};
+  const readOnly = !isViewingOwnTracker();
+  $("#pipelineMonthLabel").textContent = new Date(state.trackerYear, state.trackerMonth - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  PIPELINE_METRICS.forEach((m) => {
+    const count = $(`#pipeline-${m.key}`), remark = $(`#pipeline-${m.key}Remark`);
+    count.value = entry[m.key] ?? "";
+    remark.value = entry[`${m.key}Remark`] || "";
+    count.disabled = readOnly;
+    remark.disabled = readOnly;
+  });
+  $("#pipelineSaveBtn").classList.toggle("hidden", readOnly);
+  $("#pipelineStatus").textContent = "";
+}
+
+async function loadPipeline() {
+  const uid = trackerUserIdParam();
+  state.pipelineEntry = await api(`/api/tracker/pipeline/${trackerMonthKey()}${uid ? `?userId=${encodeURIComponent(uid)}` : ""}`);
+  fillPipelineForm();
+}
+
+function setTrackerTab(tab) {
+  state.trackerTab = tab;
+  document.querySelectorAll(".tracker-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.trackerTab === tab));
+  $("#trackerDailyPane").classList.toggle("hidden", tab !== "daily");
+  $("#trackerPipelinePane").classList.toggle("hidden", tab !== "pipeline");
+  if (tab === "pipeline") loadPipeline();
+}
+
+document.querySelectorAll(".tracker-tab").forEach((btn) => {
+  btn.addEventListener("click", () => setTrackerTab(btn.dataset.trackerTab));
+});
+
+$("#pipelineForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = {};
+  PIPELINE_METRICS.forEach((m) => {
+    const raw = $(`#pipeline-${m.key}`).value.trim();
+    body[m.key] = raw === "" ? null : Number(raw);
+    body[`${m.key}Remark`] = $(`#pipeline-${m.key}Remark`).value;
+  });
+  $("#pipelineStatus").textContent = "Saving...";
+  try {
+    state.pipelineEntry = await api(`/api/tracker/pipeline/${trackerMonthKey()}`, { method: "PUT", body: JSON.stringify(body) });
+    fillPipelineForm();
+    $("#pipelineStatus").textContent = "Saved.";
+  } catch (err) {
+    $("#pipelineStatus").textContent = err.message;
+  }
+  setTimeout(() => { $("#pipelineStatus").textContent = ""; }, 2500);
+});
+
+renderPipelineForm();
 
 function renderTrackerRatingStars(rating, readOnly) {
   const starIcon = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><polygon points="12 2.5 15.1 9 22 10 17 15 18.2 22 12 18.6 5.8 22 7 15 2 10 8.9 9"/></svg>';

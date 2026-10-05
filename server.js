@@ -360,6 +360,49 @@ app.put("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
   res.json(entry);
 });
 
+// ---------- Pipeline (monthly lead/closure progress per person) ----------
+
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const PIPELINE_METRICS = {
+  leadsReceived: "Leads received",
+  clientsInProcess: "Clients in process",
+  expectedClosures: "Expected closures",
+  dealsClosed: "Deals closed",
+};
+
+app.get("/api/tracker/pipeline/:month", auth.requireAuth, async (req, res) => {
+  if (!MONTH_RE.test(req.params.month)) return res.status(400).json({ error: "Invalid month" });
+  const userId = resolveTrackerUserId(req);
+  const entry = await db.getPipeline(userId, req.params.month);
+  if (entry) return res.json(entry);
+  const empty = { userId, month: req.params.month };
+  for (const key of Object.keys(PIPELINE_METRICS)) { empty[key] = null; empty[`${key}Remark`] = ""; }
+  res.json(empty);
+});
+
+app.put("/api/tracker/pipeline/:month", auth.requireAuth, async (req, res) => {
+  if (!MONTH_RE.test(req.params.month)) return res.status(400).json({ error: "Invalid month" });
+  // Always the logged-in user's own pipeline - admins can view others' but not edit them.
+  const fields = {};
+  for (const [key, label] of Object.entries(PIPELINE_METRICS)) {
+    const raw = req.body[key];
+    if (raw !== undefined) {
+      if (raw === null || raw === "") {
+        fields[key] = null;
+      } else {
+        const n = typeof raw === "number" || typeof raw === "string" ? Number(raw) : NaN;
+        if (!Number.isInteger(n) || n < 0 || n > 1000000) {
+          return res.status(400).json({ error: `${label} must be a whole number, 0 or more` });
+        }
+        fields[key] = n;
+      }
+    }
+    if (req.body[`${key}Remark`] !== undefined) fields[`${key}Remark`] = String(req.body[`${key}Remark`]).slice(0, 1000);
+  }
+  const entry = await db.upsertPipeline(req.user.userId, req.params.month, fields);
+  res.json(entry);
+});
+
 // ---------- Tasks (admin assigns work to one or more employees) ----------
 
 const PRIORITIES = ["low", "medium", "high"];

@@ -1135,6 +1135,51 @@ select {
 }
 .clock-time-input:focus { outline: none; border-color: var(--yellow); }
 
+/* Tracker sub-tabs (Daily log / Pipeline) */
+.tracker-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  background: var(--glass-card-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+}
+.tracker-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 9px 12px;
+  border-radius: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tracker-tab.active { background: var(--yellow); color: var(--yellow-text); }
+
+/* Pipeline: one block per metric - icon, title, count, then a remark box */
+.pipeline-metric-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.pipeline-metric-head .stat-icon-badge { flex-shrink: 0; margin: 0; }
+.pipeline-metric-title { flex: 1; min-width: 0; font-size: 0.88rem; font-weight: 700; line-height: 1.25; }
+.pipeline-metric-head input[type="number"] {
+  width: 88px;
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+.pipeline-metric-head input[type="number"]:focus { outline: none; border-color: var(--yellow); }
+.pipeline-metric-head input[type="number"]:disabled { opacity: 0.65; }
+.pipeline-metric textarea { margin-bottom: 0; }
+
 /* ---------- Tasks ---------- */
 
 .tasks-list {

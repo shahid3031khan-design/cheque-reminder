@@ -134,6 +134,12 @@
       <select id="trackerEmployeeSelect" class="hidden"></select>
     </div>
 
+    <div class="tracker-tabs" id="trackerTabs">
+      <button type="button" class="tracker-tab active" data-tracker-tab="daily">Daily log</button>
+      <button type="button" class="tracker-tab" data-tracker-tab="pipeline">Pipeline</button>
+    </div>
+
+    <div id="trackerDailyPane">
     <div class="tracker-cal-card">
       <div class="tracker-cal-nav">
         <button type="button" id="trackerPrevMonth" class="icon-btn" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg></button>
@@ -183,6 +189,22 @@
           <button type="button" id="trackerLogoutBtn" class="primary">Mark logout</button>
         </div>
         <div class="tracker-lock-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="trackerLogoutLock"></span></div>
+      </div>
+    </div>
+    </div>
+
+    <div id="trackerPipelinePane" class="hidden">
+      <div class="tracker-day-panel">
+        <div class="tracker-cal-nav pipeline-nav">
+          <button type="button" id="pipelinePrevMonth" class="icon-btn" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg></button>
+          <span id="pipelineMonthLabel">Month Year</span>
+          <button type="button" id="pipelineNextMonth" class="icon-btn" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+        </div>
+        <form id="pipelineForm">
+          <div id="pipelineMetrics"></div>
+          <button type="submit" id="pipelineSaveBtn" class="primary full-width">Save pipeline</button>
+          <p id="pipelineStatus" class="hint"></p>
+        </form>
       </div>
     </div>
   </div>
@@ -270,7 +292,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v23</div>
+<div id="appVersion" class="app-version hidden">v24</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
