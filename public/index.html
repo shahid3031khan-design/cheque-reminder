@@ -48,7 +48,7 @@
   </div>
   <div class="login-panel">
   <div class="login-card">
-    <div class="login-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-1.5a4.5 4.5 0 0 0-4.5-4.5h-7A4.5 4.5 0 0 0 4 19.5V21"/><circle cx="12" cy="7.5" r="4"/></svg></div>
+    <div class="login-icon" id="loginClipart" title="Tap for another one"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-1.5a4.5 4.5 0 0 0-4.5-4.5h-7A4.5 4.5 0 0 0 4 19.5V21"/><circle cx="12" cy="7.5" r="4"/></svg></div>
     <p class="eyebrow center">Profile</p>
     <h1 class="login-title">Sign in</h1>
     <form id="loginForm">
@@ -306,7 +306,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v30</div>
+<div id="appVersion" class="app-version hidden">v31</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -436,6 +436,7 @@
       <div class="installments-header">
         <span>Manage users</span>
       </div>
+      <div id="usersCounts" class="users-counts"></div>
       <div id="usersList" class="users-list"></div>
 
       <form id="addUserForm" class="add-user-form">
@@ -454,7 +455,7 @@
           <label>Role
             <select id="newUserRole">
               <option value="employee">Employee (view only)</option>
-              <option value="admin">Admin (full access)</option>
+              <option value="admin">Sub admin (full access)</option>
             </select>
           </label>
         </div>

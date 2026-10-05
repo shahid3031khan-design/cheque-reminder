@@ -20,6 +20,7 @@ const state = {
   pipelineEntry: null,
   pipelineClientDetails: [],
   pipelineOpenClients: new Set(),
+  revealedPasswords: {},
   tasks: [],
   taskEmployees: [],
   taskEmployeesLoaded: false,
@@ -108,10 +109,71 @@ function escapeHtml(str) {
 
 function isAdmin() { return state.currentUser?.role === "admin"; }
 
+// ---------- Login clipart (a different friendly face each time the login page shows) ----------
+
+const CLIPART_EYES = '<circle cx="38" cy="53" r="4.2" fill="#2b2b3a"/><circle cx="62" cy="53" r="4.2" fill="#2b2b3a"/><circle cx="39.3" cy="51.6" r="1.5" fill="#fff"/><circle cx="63.3" cy="51.6" r="1.5" fill="#fff"/>';
+
+function animalClipart({ bg, head, ear, earInner, ears, snout, nose = "#2b2b3a", cheek = "#ff9fb1", patches = "", whiskers = false }) {
+  const earShapes = {
+    pointy: `<path d="M22 50 L25 14 L48 32 Z" fill="${ear}"/><path d="M78 50 L75 14 L52 32 Z" fill="${ear}"/><path d="M28 40 L29 24 L40 33 Z" fill="${earInner}"/><path d="M72 40 L71 24 L60 33 Z" fill="${earInner}"/>`,
+    round: `<circle cx="27" cy="29" r="13" fill="${ear}"/><circle cx="73" cy="29" r="13" fill="${ear}"/><circle cx="27" cy="29" r="6.5" fill="${earInner}"/><circle cx="73" cy="29" r="6.5" fill="${earInner}"/>`,
+    long: `<ellipse cx="36" cy="22" rx="8" ry="20" fill="${ear}"/><ellipse cx="64" cy="22" rx="8" ry="20" fill="${ear}"/><ellipse cx="36" cy="23" rx="3.8" ry="14" fill="${earInner}"/><ellipse cx="64" cy="23" rx="3.8" ry="14" fill="${earInner}"/>`,
+    floppy: `<ellipse cx="20" cy="52" rx="11" ry="22" fill="${ear}" transform="rotate(12 20 52)"/><ellipse cx="80" cy="52" rx="11" ry="22" fill="${ear}" transform="rotate(-12 80 52)"/>`,
+  };
+  const whiskerLines = whiskers ? '<g stroke="#2b2b3a" stroke-width="1.4" stroke-linecap="round" opacity="0.6"><line x1="14" y1="62" x2="30" y2="64"/><line x1="14" y1="70" x2="30" y2="68"/><line x1="86" y1="62" x2="70" y2="64"/><line x1="86" y1="70" x2="70" y2="68"/></g>' : "";
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="50" cy="50" r="50" fill="${bg}"/>
+    ${earShapes[ears]}
+    <ellipse cx="50" cy="58" rx="30" ry="27" fill="${head}"/>
+    ${patches}
+    <ellipse cx="50" cy="68" rx="15" ry="11" fill="${snout}"/>
+    ${CLIPART_EYES}
+    <ellipse cx="50" cy="62" rx="4.2" ry="3" fill="${nose}"/>
+    <path d="M44 70 Q50 76 56 70" fill="none" stroke="#2b2b3a" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="29" cy="64" r="4.5" fill="${cheek}" opacity="0.55"/><circle cx="71" cy="64" r="4.5" fill="${cheek}" opacity="0.55"/>
+    ${whiskerLines}
+  </svg>`;
+}
+
+const PANDA_PATCHES = '<ellipse cx="38" cy="53" rx="8.5" ry="10.5" fill="#2b2b3a" transform="rotate(-20 38 53)"/><ellipse cx="62" cy="53" rx="8.5" ry="10.5" fill="#2b2b3a" transform="rotate(20 62 53)"/>';
+
+const LOGIN_CLIPARTS = [
+  animalClipart({ bg: "#FFE9B8", head: "#F4A340", ear: "#F4A340", earInner: "#FFC9A0", ears: "pointy", snout: "#FFE2B8", whiskers: true }), // cat
+  animalClipart({ bg: "#FFD9C2", head: "#EE7B30", ear: "#EE7B30", earInner: "#3b2a20", ears: "pointy", snout: "#FFF1E0" }), // fox
+  animalClipart({ bg: "#D8F0E0", head: "#FFFFFF", ear: "#2b2b3a", earInner: "#4a4a5a", ears: "round", snout: "#EDEDED", patches: PANDA_PATCHES }), // panda
+  animalClipart({ bg: "#F6E3D0", head: "#B07A4F", ear: "#B07A4F", earInner: "#E7C7A3", ears: "round", snout: "#E7C7A3" }), // bear
+  animalClipart({ bg: "#E8E2FA", head: "#FFFFFF", ear: "#FFFFFF", earInner: "#FFB6C8", ears: "long", snout: "#FDF1F5", nose: "#ff8aa6" }), // rabbit
+  animalClipart({ bg: "#DDEBFF", head: "#E9B97A", ear: "#8B5A33", earInner: "#8B5A33", ears: "floppy", snout: "#FFF0DB" }), // dog
+  // robot
+  '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="#D6F1F7"/><line x1="50" y1="15" x2="50" y2="28" stroke="#5b6b7a" stroke-width="3"/><circle cx="50" cy="13" r="5" fill="#FF6B6B"/><rect x="24" y="27" width="52" height="46" rx="12" fill="#9FB4C7"/><rect x="31" y="37" width="38" height="22" rx="8" fill="#2b2b3a"/><circle cx="42" cy="48" r="5" fill="#5CE1E6"/><circle cx="58" cy="48" r="5" fill="#5CE1E6"/><rect x="40" y="65" width="20" height="4" rx="2" fill="#5b6b7a"/><rect x="17" y="41" width="7" height="16" rx="3" fill="#7b8da0"/><rect x="76" y="41" width="7" height="16" rx="3" fill="#7b8da0"/><rect x="34" y="77" width="32" height="14" rx="6" fill="#9FB4C7"/></svg>',
+  // astronaut
+  '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="#E6E0FF"/><circle cx="18" cy="22" r="1.8" fill="#fff"/><circle cx="82" cy="30" r="2.2" fill="#fff"/><circle cx="76" cy="78" r="1.6" fill="#fff"/><circle cx="50" cy="52" r="31" fill="#FFFFFF" stroke="#CFD3E6" stroke-width="3"/><rect x="31" y="38" width="38" height="28" rx="14" fill="#2b2b3a"/><ellipse cx="42" cy="47" rx="6" ry="3.2" fill="#8B9BFF" opacity="0.65"/><circle cx="50" cy="86" r="14" fill="#FFFFFF" stroke="#CFD3E6" stroke-width="3"/><rect x="43" y="82" width="14" height="8" rx="3" fill="#FF8A6B"/></svg>',
+  // owl
+  '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="#FFF0D6"/><path d="M26 40 L28 16 L46 30 Z" fill="#8B5A33"/><path d="M74 40 L72 16 L54 30 Z" fill="#8B5A33"/><ellipse cx="50" cy="60" rx="31" ry="30" fill="#A9744F"/><ellipse cx="50" cy="70" rx="19" ry="17" fill="#F3D9B1"/><circle cx="37" cy="50" r="12" fill="#FFFFFF"/><circle cx="63" cy="50" r="12" fill="#FFFFFF"/><circle cx="37" cy="51" r="5.5" fill="#2b2b3a"/><circle cx="63" cy="51" r="5.5" fill="#2b2b3a"/><circle cx="38.8" cy="49" r="1.7" fill="#fff"/><circle cx="64.8" cy="49" r="1.7" fill="#fff"/><path d="M45 58 L55 58 L50 68 Z" fill="#F29A2E"/></svg>',
+  // penguin
+  '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="#DCEBFA"/><ellipse cx="50" cy="58" rx="30" ry="34" fill="#2F3A4F"/><ellipse cx="50" cy="64" rx="20" ry="25" fill="#FFFFFF"/><circle cx="40" cy="45" r="5.5" fill="#FFFFFF"/><circle cx="60" cy="45" r="5.5" fill="#FFFFFF"/><circle cx="40.5" cy="46" r="2.6" fill="#2b2b3a"/><circle cx="59.5" cy="46" r="2.6" fill="#2b2b3a"/><path d="M43 53 L57 53 L50 62 Z" fill="#F29A2E"/><ellipse cx="22" cy="62" rx="6" ry="16" fill="#2F3A4F" transform="rotate(14 22 62)"/><ellipse cx="78" cy="62" rx="6" ry="16" fill="#2F3A4F" transform="rotate(-14 78 62)"/><ellipse cx="40" cy="92" rx="9" ry="4" fill="#F29A2E"/><ellipse cx="60" cy="92" rx="9" ry="4" fill="#F29A2E"/></svg>',
+];
+
+function randomizeLoginClipart() {
+  const icon = $("#loginClipart");
+  if (!icon) return;
+  const previous = Number(icon.dataset.clipart);
+  let next;
+  do { next = Math.floor(Math.random() * LOGIN_CLIPARTS.length); } while (next === previous && LOGIN_CLIPARTS.length > 1);
+  icon.dataset.clipart = String(next);
+  icon.innerHTML = LOGIN_CLIPARTS[next];
+  icon.classList.add("clipart");
+}
+
+$("#loginClipart").addEventListener("click", randomizeLoginClipart);
+randomizeLoginClipart();
+
 // ---------- Auth / bootstrap ----------
 
 function showLoginScreen() {
   state.currentUser = null;
+  state.revealedPasswords = {};
+  randomizeLoginClipart();
   $("#loginScreen").classList.remove("hidden");
   $("#appRoot").classList.add("hidden");
   sessionExpiredHandled = false;
@@ -1466,7 +1528,11 @@ async function loadConfig() {
 }
 
 function openSettingsModal() { $("#settingsModal").classList.remove("hidden"); }
-function closeSettingsModal() { $("#settingsModal").classList.add("hidden"); }
+function closeSettingsModal() {
+  $("#settingsModal").classList.add("hidden");
+  state.revealedPasswords = {}; // never leave revealed passwords sitting on screen
+  if (state.users.length) renderUsers();
+}
 
 async function showSettings() {
   await loadConfig();
@@ -1561,20 +1627,49 @@ async function loadUsers() {
   renderUsers();
 }
 
+// Limits (also enforced by the server): 3 admins in total (the main admin + sub admins) and 12 employees.
+const MAX_ADMINS = 3;
+const MAX_EMPLOYEES = 12;
+
+function iAmMainAdmin() {
+  return !!state.users.find((u) => u.id === state.currentUser.id)?.isMainAdmin;
+}
+
 function renderUsers() {
-  $("#usersList").innerHTML = state.users.map(u => `
+  const viewerIsMain = iAmMainAdmin();
+  const adminCount = state.users.filter((u) => u.role === "admin").length;
+  const employeeCount = state.users.filter((u) => u.role === "employee").length;
+  $("#usersCounts").innerHTML =
+    `<span class="${adminCount >= MAX_ADMINS ? "full" : ""}">Admins ${adminCount}/${MAX_ADMINS}</span>` +
+    `<span class="${employeeCount >= MAX_EMPLOYEES ? "full" : ""}">Employees ${employeeCount}/${MAX_EMPLOYEES}</span>`;
+
+  $("#usersList").innerHTML = state.users.map((u) => {
+    const roleLabel = u.isMainAdmin ? "Main admin" : u.role === "admin" ? "Sub admin" : "Employee";
+    const roleClass = u.isMainAdmin ? "main" : u.role;
+    const lockedForMe = u.isMainAdmin && !viewerIsMain; // sub admins can't see or change the main admin's account
+    const revealed = state.revealedPasswords[u.id];
+    let pwLine = "";
+    if (revealed) {
+      pwLine = revealed.available
+        ? `<div class="user-row-pw"><span class="muted">Password</span><code>${escapeHtml(revealed.password)}</code><button type="button" data-action="copy-pw">Copy</button></div>`
+        : `<div class="user-row-pw"><span class="muted">Not available yet - it shows up after ${escapeHtml(u.displayName || u.username)} next signs in, or reset it.</span></div>`;
+    }
+    const actions = lockedForMe
+      ? `<span class="hint" style="margin:0;">Only Shahid can manage this account</span>`
+      : `<button type="button" data-action="toggle-pw">${revealed ? "Hide password" : "Show password"}</button>
+         <button type="button" data-action="reset-pw">Reset password</button>
+         ${u.isMainAdmin ? "" : '<button type="button" data-action="delete-user" class="danger">Delete</button>'}`;
+    return `
     <div class="user-row" data-id="${u.id}">
       <div class="user-row-info">
         <span class="user-row-name">${escapeHtml(u.displayName || u.username)}</span>
-        <span class="user-row-role ${u.role}">${u.role}</span>
+        <span class="user-row-role ${roleClass}">${roleLabel}</span>
         <div class="hint" style="margin:2px 0 0;">@${escapeHtml(u.username)}${u.username === state.currentUser.username ? " (you)" : ""}</div>
       </div>
-      <div class="user-row-actions">
-        <button type="button" data-action="reset-pw">Reset password</button>
-        <button type="button" data-action="delete-user" class="danger">Delete</button>
-      </div>
-    </div>
-  `).join("");
+      <div class="user-row-actions">${actions}</div>
+      ${pwLine}
+    </div>`;
+  }).join("");
 }
 
 $("#usersList").addEventListener("click", async (e) => {
@@ -1585,7 +1680,28 @@ $("#usersList").addEventListener("click", async (e) => {
   const user = state.users.find(u => u.id === id);
   $("#usersStatus").classList.add("hidden");
 
-  if (btn.dataset.action === "delete-user") {
+  if (btn.dataset.action === "toggle-pw") {
+    if (state.revealedPasswords[id]) {
+      delete state.revealedPasswords[id];
+    } else {
+      try {
+        state.revealedPasswords[id] = await api(`/api/users/${id}/password`);
+      } catch (err) {
+        $("#usersStatus").textContent = err.message;
+        $("#usersStatus").classList.remove("hidden");
+        return;
+      }
+    }
+    renderUsers();
+  } else if (btn.dataset.action === "copy-pw") {
+    try {
+      await navigator.clipboard.writeText(state.revealedPasswords[id].password);
+      btn.textContent = "Copied";
+    } catch {
+      btn.textContent = "Select & copy";
+    }
+    setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+  } else if (btn.dataset.action === "delete-user") {
     if (!confirm(`Delete the login for ${user.username}?`)) return;
     try {
       await api(`/api/users/${id}`, { method: "DELETE" });
@@ -1599,6 +1715,8 @@ $("#usersList").addEventListener("click", async (e) => {
     if (!newPw) return;
     try {
       await api(`/api/users/${id}/password`, { method: "PUT", body: JSON.stringify({ password: newPw }) });
+      delete state.revealedPasswords[id];
+      await loadUsers();
       alert(`Password updated for ${user.username}.`);
     } catch (err) {
       $("#usersStatus").textContent = err.message;

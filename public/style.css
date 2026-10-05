@@ -125,6 +125,19 @@ body {
 .icon-btn svg { width: 19px; height: 19px; }
 .nav-icon svg { width: 21px; height: 21px; display: block; }
 .login-icon svg { width: 26px; height: 26px; }
+.login-icon.clipart {
+  width: 78px;
+  height: 78px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--panel);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 18px rgba(60, 40, 120, 0.22);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease;
+}
+.login-icon.clipart:active { transform: scale(0.94); }
+.login-icon.clipart svg { width: 100%; height: 100%; display: block; }
 .card-actions button svg,
 .deal-cheque-row-actions button svg { width: 15px; height: 15px; }
 .remove-row-btn svg { width: 15px; height: 15px; }
@@ -883,8 +896,12 @@ select {
   margin-bottom: 16px;
 }
 
+.users-counts { display: flex; gap: 14px; margin-bottom: 10px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); }
+.users-counts .full { color: var(--red); }
+
 .user-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -904,7 +921,32 @@ select {
 }
 .user-row-role.admin { background: var(--yellow-soft); color: var(--yellow-dark); }
 .user-row-role.employee { background: var(--gray-soft); color: var(--text-muted); }
-.user-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.user-row-role.main { background: var(--yellow); color: var(--yellow-text); }
+.user-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.user-row-pw {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--gray-soft);
+  font-size: 0.8rem;
+}
+.user-row-pw code { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; color: var(--text); word-break: break-all; user-select: all; }
+.user-row-pw .muted { color: var(--text-muted); }
+.user-row-pw button {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
 .user-row-actions button {
   background: transparent;
   border: 1px solid var(--border);
@@ -919,6 +961,10 @@ select {
 .user-row-actions button.danger:hover { color: var(--red); border-color: var(--red); }
 
 .add-user-form { margin-top: 4px; }
+/* Let the two-column fields shrink to the sheet width instead of pushing the form off-screen on phones. */
+.add-user-form .form-row label { min-width: 0; }
+.add-user-form .form-row input,
+.add-user-form .form-row select { width: 100%; min-width: 0; box-sizing: border-box; }
 
 /* ---------- Tracker ---------- */
 

@@ -60,7 +60,15 @@ function setSessionCookie(res, token, ttlMs) {
 }
 
 function publicUser(u) {
-  return { id: u.id, username: u.username, displayName: u.displayName, role: u.role, createdAt: u.createdAt };
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    role: u.role,
+    createdAt: u.createdAt,
+    isMainAdmin: auth.isMainAdmin(u),
+    hasViewablePassword: !!u.passwordEnc,
+  };
 }
 
 // ---------- Auth ----------
@@ -69,6 +77,9 @@ app.post("/api/login", loginLimiter, async (req, res) => {
   const username = String(req.body.username || "").trim();
   const user = await db.findUserByUsername(username);
   if (user && auth.checkPassword(req.body.password || "", user.passwordHash, user.passwordSalt)) {
+    // Accounts created before the view-password feature only have a hash. We hold the plaintext right now
+    // (they just typed it correctly), so store the encrypted copy and it becomes viewable to admins.
+    if (!user.passwordEnc) await db.setUserPasswordEnc(user.id, auth.encryptPassword(req.body.password));
     const { token, ttlMs } = auth.createSession(user, !!req.body.rememberMe);
     setSessionCookie(res, token, ttlMs);
     res.json(publicUser(user));
@@ -152,13 +163,25 @@ app.get("/api/users", auth.requireAdmin, async (req, res) => {
   res.json(list.map(publicUser));
 });
 
+// Only the main admin (Shahid) adds users; sub admins get a pointer to him. Caps: 3 admins (main + sub) and 12 employees.
+const MAX_ADMINS = 3;
+const MAX_EMPLOYEES = 12;
+
 app.post("/api/users", auth.requireAdmin, async (req, res) => {
+  if (!auth.isMainAdmin(req.user)) return res.status(403).json({ error: "Ask Shahid to add new user" });
   const username = String(req.body.username || "").trim();
   const password = req.body.password || "";
   if (!username || !password) return res.status(400).json({ error: "Username and password are required" });
   if (await db.findUserByUsername(username)) return res.status(409).json({ error: "That username is already taken" });
 
   const role = req.body.role === "admin" ? "admin" : "employee";
+  const existing = await db.getUsers();
+  if (role === "admin" && existing.filter((u) => u.role === "admin").length >= MAX_ADMINS) {
+    return res.status(400).json({ error: `Maximum of ${MAX_ADMINS} admins reached` });
+  }
+  if (role === "employee" && existing.filter((u) => u.role === "employee").length >= MAX_EMPLOYEES) {
+    return res.status(400).json({ error: `Maximum of ${MAX_EMPLOYEES} employees reached` });
+  }
   const pw = auth.newPasswordHash(password);
   const newUser = {
     id: db.newId("u"),
@@ -167,18 +190,35 @@ app.post("/api/users", auth.requireAdmin, async (req, res) => {
     role,
     passwordHash: pw.hash,
     passwordSalt: pw.salt,
+    passwordEnc: auth.encryptPassword(password),
     createdAt: new Date().toISOString(),
   };
   await db.insertUser(newUser);
   res.status(201).json(publicUser(newUser));
 });
 
+// Reveal a user's password to an admin. The main admin's password is only ever shown to the main admin.
+app.get("/api/users/:id/password", auth.requireAdmin, async (req, res) => {
+  const target = await db.findUserById(req.params.id);
+  if (!target) return res.status(404).json({ error: "User not found" });
+  if (auth.isMainAdmin(target) && !auth.isMainAdmin(req.user)) {
+    return res.status(403).json({ error: "Only Shahid can see the main admin's password" });
+  }
+  res.set("Cache-Control", "no-store");
+  const password = target.passwordEnc ? auth.decryptPassword(target.passwordEnc) : null;
+  if (password === null) return res.json({ available: false });
+  res.json({ available: true, password });
+});
+
 app.put("/api/users/:id/password", auth.requireAdmin, async (req, res) => {
   if (!req.body.password) return res.status(400).json({ error: "Password is required" });
   const target = await db.findUserById(req.params.id);
   if (!target) return res.status(404).json({ error: "User not found" });
+  if (auth.isMainAdmin(target) && !auth.isMainAdmin(req.user)) {
+    return res.status(403).json({ error: "Only Shahid can change the main admin's password" });
+  }
   const pw = auth.newPasswordHash(req.body.password);
-  await db.updateUserPassword(target.id, pw.hash, pw.salt);
+  await db.updateUserPassword(target.id, pw.hash, pw.salt, auth.encryptPassword(req.body.password));
   auth.destroySessionsForUser(target.id); // force re-login with the new password everywhere
   res.json({ ok: true });
 });
@@ -186,6 +226,7 @@ app.put("/api/users/:id/password", auth.requireAdmin, async (req, res) => {
 app.delete("/api/users/:id", auth.requireAdmin, async (req, res) => {
   const target = await db.findUserById(req.params.id);
   if (!target) return res.status(404).json({ error: "User not found" });
+  if (auth.isMainAdmin(target)) return res.status(403).json({ error: "The main admin account can't be deleted" });
   if (target.role === "admin" && (await db.countAdmins()) <= 1) {
     return res.status(400).json({ error: "Cannot delete the last admin account" });
   }
