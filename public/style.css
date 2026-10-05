@@ -748,6 +748,10 @@ select {
   box-shadow: var(--shadow);
   white-space: nowrap;
 }
+.user-badge { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.user-badge:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.account-who { margin: 4px 0 16px; }
+#accountPw { margin-top: 10px; }
 .user-badge svg { width: 14px; height: 14px; flex-shrink: 0; }
 .user-badge .role-admin { color: var(--yellow-dark); }
 .user-badge .role-employee { color: var(--text-muted); }

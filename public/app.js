@@ -1627,8 +1627,67 @@ async function loadUsers() {
   renderUsers();
 }
 
-// Limits (also enforced by the server): 3 admins in total (the main admin + sub admins) and 12 employees.
-const MAX_ADMINS = 3;
+// ---------- My account (everyone can see their own password) ----------
+
+function resetAccountPassword() {
+  $("#accountPw").classList.add("hidden");
+  $("#accountPw").innerHTML = "";
+  $("#accountPwBtn").textContent = "Show my password";
+  $("#accountStatus").textContent = "";
+}
+
+function openAccountModal() {
+  const user = state.currentUser;
+  if (!user) return;
+  $("#accountName").textContent = user.displayName || user.username;
+  $("#accountRole").textContent = user.role === "admin" ? "Admin" : "Employee";
+  $("#accountRole").className = `user-row-role ${user.role}`;
+  $("#accountUsername").textContent = `@${user.username}`;
+  resetAccountPassword();
+  $("#accountModal").classList.remove("hidden");
+}
+
+function closeAccountModal() {
+  $("#accountModal").classList.add("hidden");
+  resetAccountPassword(); // never leave the password sitting on screen
+}
+
+$("#userBadge").addEventListener("click", openAccountModal);
+$("#userBadge").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAccountModal(); }
+});
+$("#closeAccountBtn").addEventListener("click", closeAccountModal);
+$("#accountModal").addEventListener("click", (e) => {
+  if (e.target.id === "accountModal") closeAccountModal();
+});
+
+$("#accountPwBtn").addEventListener("click", async () => {
+  if (!$("#accountPw").classList.contains("hidden")) { resetAccountPassword(); return; }
+  try {
+    const result = await api(`/api/users/${state.currentUser.id}/password`);
+    $("#accountPw").innerHTML = result.available
+      ? `<span class="muted">Password</span><code>${escapeHtml(result.password)}</code><button type="button" id="accountCopyBtn">Copy</button>`
+      : `<span class="muted">Not available right now - ask your admin to reset your password.</span>`;
+    $("#accountPw").classList.remove("hidden");
+    $("#accountPwBtn").textContent = "Hide password";
+  } catch (err) {
+    $("#accountStatus").textContent = err.message;
+  }
+});
+
+$("#accountPw").addEventListener("click", async (e) => {
+  if (e.target.id !== "accountCopyBtn") return;
+  try {
+    await navigator.clipboard.writeText($("#accountPw code").textContent);
+    e.target.textContent = "Copied";
+  } catch {
+    e.target.textContent = "Select & copy";
+  }
+  setTimeout(() => { e.target.textContent = "Copy"; }, 1500);
+});
+
+// Limits (also enforced by the server): 1 main admin (Shahid), 3 sub admins and 12 employees.
+const MAX_SUB_ADMINS = 3;
 const MAX_EMPLOYEES = 12;
 
 function iAmMainAdmin() {
@@ -1637,10 +1696,12 @@ function iAmMainAdmin() {
 
 function renderUsers() {
   const viewerIsMain = iAmMainAdmin();
-  const adminCount = state.users.filter((u) => u.role === "admin").length;
+  const mainCount = state.users.filter((u) => u.isMainAdmin).length;
+  const subAdminCount = state.users.filter((u) => u.role === "admin" && !u.isMainAdmin).length;
   const employeeCount = state.users.filter((u) => u.role === "employee").length;
   $("#usersCounts").innerHTML =
-    `<span class="${adminCount >= MAX_ADMINS ? "full" : ""}">Admins ${adminCount}/${MAX_ADMINS}</span>` +
+    `<span>Main admin ${mainCount}/1</span>` +
+    `<span class="${subAdminCount >= MAX_SUB_ADMINS ? "full" : ""}">Sub admins ${subAdminCount}/${MAX_SUB_ADMINS}</span>` +
     `<span class="${employeeCount >= MAX_EMPLOYEES ? "full" : ""}">Employees ${employeeCount}/${MAX_EMPLOYEES}</span>`;
 
   $("#usersList").innerHTML = state.users.map((u) => {

@@ -163,8 +163,9 @@ app.get("/api/users", auth.requireAdmin, async (req, res) => {
   res.json(list.map(publicUser));
 });
 
-// Only the main admin (Shahid) adds users; sub admins get a pointer to him. Caps: 3 admins (main + sub) and 12 employees.
-const MAX_ADMINS = 3;
+// Only the main admin (Shahid) adds users; sub admins get a pointer to him.
+// Caps: 1 main admin (Shahid himself - there can't be a second), 3 sub admins and 12 employees.
+const MAX_SUB_ADMINS = 3;
 const MAX_EMPLOYEES = 12;
 
 app.post("/api/users", auth.requireAdmin, async (req, res) => {
@@ -176,8 +177,8 @@ app.post("/api/users", auth.requireAdmin, async (req, res) => {
 
   const role = req.body.role === "admin" ? "admin" : "employee";
   const existing = await db.getUsers();
-  if (role === "admin" && existing.filter((u) => u.role === "admin").length >= MAX_ADMINS) {
-    return res.status(400).json({ error: `Maximum of ${MAX_ADMINS} admins reached` });
+  if (role === "admin" && existing.filter((u) => u.role === "admin" && !auth.isMainAdmin(u)).length >= MAX_SUB_ADMINS) {
+    return res.status(400).json({ error: `Maximum of ${MAX_SUB_ADMINS} sub admins reached` });
   }
   if (role === "employee" && existing.filter((u) => u.role === "employee").length >= MAX_EMPLOYEES) {
     return res.status(400).json({ error: `Maximum of ${MAX_EMPLOYEES} employees reached` });
@@ -197,11 +198,14 @@ app.post("/api/users", auth.requireAdmin, async (req, res) => {
   res.status(201).json(publicUser(newUser));
 });
 
-// Reveal a user's password to an admin. The main admin's password is only ever shown to the main admin.
-app.get("/api/users/:id/password", auth.requireAdmin, async (req, res) => {
+// Who can see whose password: the main admin sees everyone's; a sub admin sees everyone's except the main
+// admin's; an employee sees only their own. (Everyone can see their own.)
+app.get("/api/users/:id/password", auth.requireAuth, async (req, res) => {
+  const isSelf = req.params.id === req.user.userId;
+  if (!isSelf && req.user.role !== "admin") return res.status(403).json({ error: "You can only see your own password" });
   const target = await db.findUserById(req.params.id);
   if (!target) return res.status(404).json({ error: "User not found" });
-  if (auth.isMainAdmin(target) && !auth.isMainAdmin(req.user)) {
+  if (!isSelf && auth.isMainAdmin(target) && !auth.isMainAdmin(req.user)) {
     return res.status(403).json({ error: "Only Shahid can see the main admin's password" });
   }
   res.set("Cache-Control", "no-store");
