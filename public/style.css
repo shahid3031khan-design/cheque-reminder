@@ -752,6 +752,41 @@ select {
 .user-badge:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 .account-who { margin: 4px 0 16px; }
 #accountPw { margin-top: 10px; }
+
+/* Phone notifications: home prompt, "this phone" section, attendance reminder days */
+.push-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  background: var(--glass-card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.push-prompt-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 200px; font-size: 0.78rem; color: var(--text-muted); }
+.push-prompt-text strong { font-size: 0.9rem; color: var(--text); }
+.push-prompt-actions { display: flex; gap: 8px; }
+.push-prompt-actions button { padding: 8px 14px; font-size: 0.8rem; }
+.device-notif-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.device-notif-actions button { padding: 9px 14px; font-size: 0.82rem; }
+.weekday-picks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.weekday-pick {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.8rem;
+  color: var(--text);
+}
 .user-badge svg { width: 14px; height: 14px; flex-shrink: 0; }
 .user-badge .role-admin { color: var(--yellow-dark); }
 .user-badge .role-employee { color: var(--text-muted); }

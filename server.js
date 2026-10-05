@@ -1,4 +1,6 @@
 require("dotenv").config();
+// Render's servers run on UTC. Reminder times, "today" and the 9am sweep should follow the team's clock instead.
+process.env.TZ = process.env.APP_TIMEZONE || "Asia/Dubai";
 const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
@@ -9,6 +11,7 @@ const rateLimit = require("express-rate-limit");
 const db = require("./lib/db");
 const auth = require("./lib/auth");
 const reminders = require("./lib/reminders");
+const push = require("./lib/push");
 
 const app = express();
 const PORT = process.env.PORT || 8743;
@@ -156,6 +159,47 @@ app.post("/api/me/notifications/test", auth.requireAuth, async (req, res) => {
   res.json({ ok });
 });
 
+// ---------- Phone notifications (Web Push) - every user manages their own devices ----------
+
+app.get("/api/push/public-key", auth.requireAuth, async (req, res) => {
+  try {
+    res.json({ publicKey: await push.publicKey() });
+  } catch (err) {
+    console.error("Push keys unavailable:", err);
+    res.status(503).json({ error: "Phone notifications aren't available right now" });
+  }
+});
+
+app.post("/api/push/subscribe", auth.requireAuth, async (req, res) => {
+  const sub = req.body.subscription;
+  const endpoint = typeof sub?.endpoint === "string" ? sub.endpoint : "";
+  const p256dh = typeof sub?.keys?.p256dh === "string" ? sub.keys.p256dh : "";
+  const authKey = typeof sub?.keys?.auth === "string" ? sub.keys.auth : "";
+  if (!endpoint || endpoint.length > 1000 || !p256dh || p256dh.length > 200 || !authKey || authKey.length > 100) {
+    return res.status(400).json({ error: "Invalid subscription" });
+  }
+  if (!push.isAllowedEndpoint(endpoint)) return res.status(400).json({ error: "Unsupported notification service" });
+  await db.addPushSubscription(req.user.userId, { endpoint, keys: { p256dh, auth: authKey } }, String(req.headers["user-agent"] || "").slice(0, 200));
+  res.json({ ok: true });
+});
+
+app.post("/api/push/unsubscribe", auth.requireAuth, async (req, res) => {
+  const endpoint = typeof req.body.endpoint === "string" ? req.body.endpoint : "";
+  if (endpoint) await db.removePushSubscriptionForUser(req.user.userId, endpoint);
+  res.json({ ok: true });
+});
+
+app.post("/api/push/test", auth.requireAuth, async (req, res) => {
+  try {
+    const sent = await push.sendToUser(req.user.userId, { title: "Profile test", body: "Notifications are working on this phone.", url: "/" });
+    if (!sent) return res.status(400).json({ error: "No phone is registered for notifications yet" });
+    res.json({ ok: true, sent });
+  } catch (err) {
+    console.error("Push test failed:", err);
+    res.status(500).json({ error: "Couldn't send the test notification" });
+  }
+});
+
 // ---------- Users (admin only) ----------
 
 app.get("/api/users", auth.requireAdmin, async (req, res) => {
@@ -235,6 +279,7 @@ app.delete("/api/users/:id", auth.requireAdmin, async (req, res) => {
     return res.status(400).json({ error: "Cannot delete the last admin account" });
   }
   await db.deleteUser(target.id);
+  await db.removePushSubscriptionsForUser(target.id); // their phones stop getting notifications
   auth.destroySessionsForUser(target.id); // revoke any sessions the deleted account still held
   res.json({ ok: true });
 });
@@ -638,11 +683,18 @@ async function start() {
   await db.connectDB();
   console.log("Connected to MongoDB.");
 
-  // Daily reminder sweep at 9am server time, plus dedupe means re-running is harmless.
+  // Daily cheque/task sweep at 9am (team time - see the TZ line at the top), plus dedupe means re-running is harmless.
   cron.schedule("0 9 * * *", () => {
     reminders.runDailyReminderCheck().catch((err) => console.error("Reminder check failed:", err));
     reminders.runTaskReminderCheck().catch((err) => console.error("Task reminder check failed:", err));
-  });
+  }, { timezone: process.env.TZ });
+
+  // Attendance reminder: checked every 5 minutes so the admin can change the time in Settings. Each person is
+  // reminded at most once a day, and the check also runs shortly after boot so a server that was asleep at the
+  // reminder time still catches up when it wakes.
+  const attendanceSweep = () => reminders.runAttendanceReminderCheck().catch((err) => console.error("Attendance reminder failed:", err));
+  cron.schedule("*/5 * * * *", attendanceSweep, { timezone: process.env.TZ });
+  setTimeout(attendanceSweep, 20 * 1000);
 
   app.listen(PORT, () => {
     console.log(`Cheque Reminder (cloud) listening on port ${PORT}`);

@@ -86,6 +86,13 @@
   </header>
 
   <div id="homeView">
+  <div id="pushPrompt" class="push-prompt hidden">
+    <div class="push-prompt-text"><strong>Get reminders on this phone</strong><span>Attendance, task and cheque alerts, even when the app is closed.</span></div>
+    <div class="push-prompt-actions">
+      <button type="button" id="pushPromptOnBtn" class="primary">Turn on</button>
+      <button type="button" id="pushPromptLaterBtn" class="secondary">Not now</button>
+    </div>
+  </div>
   <section class="stats" id="stats">
     <div class="stat-card stat-urgent">
       <span class="stat-icon-badge badge-mint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3.5" y1="10" x2="20.5" y2="10"/></svg></span>
@@ -306,7 +313,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v33</div>
+<div id="appVersion" class="app-version hidden">v34</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -426,6 +433,23 @@
         </label>
       </fieldset>
 
+      <fieldset id="attendanceReminderFieldset" class="hidden">
+        <legend><label><input type="checkbox" id="attReminderEnabled"> Attendance reminder</label></legend>
+        <p class="hint">Sends a notification to anyone who hasn't marked attendance (and isn't on leave) once this time has passed, on the days you tick. Uses Dubai time.</p>
+        <label>Remind at
+          <input type="time" id="attReminderTime" value="10:00">
+        </label>
+        <div class="weekday-picks" id="attReminderDays">
+          <label class="weekday-pick"><input type="checkbox" data-day="1"> Mon</label>
+          <label class="weekday-pick"><input type="checkbox" data-day="2"> Tue</label>
+          <label class="weekday-pick"><input type="checkbox" data-day="3"> Wed</label>
+          <label class="weekday-pick"><input type="checkbox" data-day="4"> Thu</label>
+          <label class="weekday-pick"><input type="checkbox" data-day="5"> Fri</label>
+          <label class="weekday-pick"><input type="checkbox" data-day="6"> Sat</label>
+          <label class="weekday-pick"><input type="checkbox" data-day="0"> Sun</label>
+        </div>
+      </fieldset>
+
       <div class="form-actions">
         <button type="submit" class="primary">Save settings</button>
       </div>
@@ -479,6 +503,16 @@
     </div>
     <p class="hint" id="notifIntro">Choose how you personally get reminded about upcoming cheques and your tasks.</p>
     <form id="notifForm">
+      <fieldset id="deviceNotifSection" class="hidden">
+        <legend>Notifications on this phone</legend>
+        <p class="hint" id="deviceNotifHint"></p>
+        <div class="device-notif-actions">
+          <button type="button" class="primary" id="deviceNotifOnBtn">Turn on notifications</button>
+          <button type="button" class="secondary" id="deviceNotifTestBtn">Send test</button>
+          <button type="button" class="secondary" id="deviceNotifOffBtn">Turn off</button>
+        </div>
+      </fieldset>
+
       <fieldset>
         <legend><label><input type="checkbox" id="notifEmailEnabled"> Email</label></legend>
         <p class="hint" id="notifEmailHint">Ask your admin to set up the sending account in Settings first if this doesn't send.</p>

@@ -276,6 +276,16 @@ async function bootstrapApp() {
   applyRoleUI();
   await loadDisplaySettings();
   await loadCheques();
+  handleDeepLink();
+  loadPhonePushCapability();
+}
+
+// Tapping a phone notification opens the app at /?go=tracker (or tasks) - land on that screen.
+function handleDeepLink() {
+  const go = new URLSearchParams(location.search).get("go");
+  if (!go) return;
+  if (["tracker", "tasks", "calls"].includes(go)) switchView(go);
+  history.replaceState(null, "", location.pathname);
 }
 
 (async function init() {
@@ -1525,6 +1535,10 @@ async function loadConfig() {
   $("#emailEnabled").checked = !!state.config.email?.enabled;
   $("#smtpUser").value = state.config.email?.smtpUser || "";
   $("#smtpAppPassword").value = state.config.email?.smtpAppPassword || "";
+  const attendance = { enabled: true, time: "10:00", days: [1, 2, 3, 4, 5, 6], ...(state.config.attendanceReminder || {}) };
+  $("#attReminderEnabled").checked = !!attendance.enabled;
+  $("#attReminderTime").value = attendance.time;
+  document.querySelectorAll("#attReminderDays input").forEach((box) => { box.checked = attendance.days.includes(Number(box.dataset.day)); });
 }
 
 function openSettingsModal() { $("#settingsModal").classList.remove("hidden"); }
@@ -1557,12 +1571,158 @@ $("#settingsForm").addEventListener("submit", async (e) => {
       smtpUser: $("#smtpUser").value,
       smtpAppPassword: $("#smtpAppPassword").value,
     },
+    attendanceReminder: {
+      enabled: $("#attReminderEnabled").checked,
+      time: $("#attReminderTime").value || "10:00",
+      days: [...document.querySelectorAll("#attReminderDays input:checked")].map((box) => Number(box.dataset.day)),
+    },
   };
   await api("/api/config", { method: "PUT", body: JSON.stringify(config) });
   state.config = config;
   $("#settingsStatus").textContent = "Saved.";
   render();
   setTimeout(() => { $("#settingsStatus").textContent = ""; }, 2000);
+});
+
+// ---------- Phone notifications (Web Push) ----------
+// Real notifications that arrive even when the app is closed. Only the cloud server supports them: when it has no
+// push keys to offer (e.g. the local PowerShell copy), every phone-notification control stays hidden.
+
+const phonePush = { available: false, publicKey: null, subscribed: false };
+
+function pushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+
+function onIphone() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isInstalledApp() {
+  return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+}
+
+function base64UrlToBytes(base64Url) {
+  const padded = base64Url + "=".repeat((4 - (base64Url.length % 4)) % 4);
+  const raw = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+// serviceWorker.ready never settles when no worker gets registered, so never wait on it unbounded.
+function serviceWorkerReady(timeoutMs = 4000) {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("The app isn't ready for notifications yet. Reload the page and try again.")), timeoutMs)),
+  ]);
+}
+
+async function currentPushSubscription() {
+  if (!pushSupported()) return null;
+  try {
+    const registration = await serviceWorkerReady(2500);
+    return await registration.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+}
+
+function pushPromptDismissedRecently() {
+  try {
+    const at = Number(localStorage.getItem("pushPromptDismissedAt") || 0);
+    return Date.now() - at < 7 * 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+async function loadPhonePushCapability() {
+  try {
+    const res = await fetch("/api/push/public-key");
+    if (!res.ok) throw new Error("unavailable");
+    phonePush.publicKey = (await res.json()).publicKey;
+    phonePush.available = !!phonePush.publicKey;
+  } catch {
+    phonePush.available = false;
+  }
+  phonePush.subscribed = !!(await currentPushSubscription());
+  renderPhonePushUI();
+}
+
+function renderPhonePushUI() {
+  $("#deviceNotifSection").classList.toggle("hidden", !phonePush.available);
+  $("#attendanceReminderFieldset").classList.toggle("hidden", !(phonePush.available && isAdmin()));
+  const hint = $("#deviceNotifHint");
+  ["#deviceNotifOnBtn", "#deviceNotifTestBtn", "#deviceNotifOffBtn"].forEach((sel) => $(sel).classList.add("hidden"));
+  $("#pushPrompt").classList.add("hidden");
+  if (!phonePush.available) return;
+
+  if (!pushSupported()) {
+    hint.textContent = onIphone() && !isInstalledApp()
+      ? "On iPhone, first add this app to your Home Screen (tap Share, then Add to Home Screen), then open it from there and come back here to turn notifications on."
+      : "This browser can't show app notifications.";
+    return;
+  }
+  if (Notification.permission === "denied") {
+    hint.textContent = "Notifications are blocked for this app. Allow them in your phone's settings for this app, then come back here.";
+    return;
+  }
+  if (phonePush.subscribed) {
+    hint.textContent = "On - this phone gets your reminders even when the app is closed.";
+    $("#deviceNotifTestBtn").classList.remove("hidden");
+    $("#deviceNotifOffBtn").classList.remove("hidden");
+    return;
+  }
+  hint.textContent = "Off. Turn it on to get attendance, task and cheque reminders on this phone, even when the app is closed.";
+  $("#deviceNotifOnBtn").classList.remove("hidden");
+  if (Notification.permission === "default" && !pushPromptDismissedRecently()) $("#pushPrompt").classList.remove("hidden");
+}
+
+async function enablePhonePush() {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      const registration = await serviceWorkerReady();
+      const subscription = (await registration.pushManager.getSubscription())
+        || await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(phonePush.publicKey) });
+      await api("/api/push/subscribe", { method: "POST", body: JSON.stringify({ subscription: subscription.toJSON() }) });
+      phonePush.subscribed = true;
+      $("#notifStatus").textContent = "Notifications are on for this phone.";
+    }
+  } catch (err) {
+    $("#notifStatus").textContent = `Couldn't turn on notifications: ${err.message || err}`;
+  }
+  renderPhonePushUI();
+  setTimeout(() => { $("#notifStatus").textContent = ""; }, 4000);
+}
+
+async function disablePhonePush() {
+  const subscription = await currentPushSubscription();
+  if (subscription) {
+    try { await api("/api/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint: subscription.endpoint }) }); } catch {}
+    try { await subscription.unsubscribe(); } catch {}
+  }
+  phonePush.subscribed = false;
+  renderPhonePushUI();
+}
+
+$("#deviceNotifOnBtn").addEventListener("click", enablePhonePush);
+$("#deviceNotifOffBtn").addEventListener("click", disablePhonePush);
+$("#deviceNotifTestBtn").addEventListener("click", async () => {
+  const btn = $("#deviceNotifTestBtn");
+  btn.textContent = "Sending...";
+  try {
+    await api("/api/push/test", { method: "POST" });
+    $("#notifStatus").textContent = "Sent - it should pop up on your phone in a few seconds.";
+  } catch (err) {
+    $("#notifStatus").textContent = err.message || "Test failed.";
+  }
+  btn.textContent = "Send test";
+  setTimeout(() => { $("#notifStatus").textContent = ""; }, 4000);
+});
+$("#pushPromptOnBtn").addEventListener("click", enablePhonePush);
+$("#pushPromptLaterBtn").addEventListener("click", () => {
+  try { localStorage.setItem("pushPromptDismissedAt", String(Date.now())); } catch {}
+  $("#pushPrompt").classList.add("hidden");
 });
 
 // ---------- My Notifications (per-user prefs) ----------
@@ -1583,6 +1743,8 @@ function closeNotifModal() { $("#notifModal").classList.add("hidden"); }
 
 $("#notifBtn").addEventListener("click", async () => {
   await loadNotifPrefs();
+  phonePush.subscribed = !!(await currentPushSubscription());
+  renderPhonePushUI();
   $("#notifIntro").textContent = isAdmin()
     ? "Choose how you personally get reminded about upcoming cheques and your tasks."
     : "Choose how you personally get reminded about your tasks.";
