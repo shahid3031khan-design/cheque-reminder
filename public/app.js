@@ -133,6 +133,7 @@ function applyRoleUI() {
   const admin = isAdmin();
   $("#userBadge").innerHTML = `${ICONS.user}${escapeHtml(state.currentUser.displayName || state.currentUser.username)} · <span class="role-${state.currentUser.role}">${state.currentUser.role}</span>`;
   $("#settingsBtn").classList.toggle("hidden", !admin);
+  $("#appVersion").classList.toggle("hidden", !admin);
   updateAddBtnVisibility();
   $("#navRightIcon").innerHTML = admin ? ICONS.settings : ICONS.power;
   $("#navRightLabel").textContent = admin ? "Settings" : "Logout";
