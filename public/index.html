@@ -63,7 +63,10 @@
         <a href="#" id="forgotPasswordLink">Forgot password?</a>
       </div>
       <p id="loginError" class="login-error hidden"></p>
-      <button type="submit" class="primary full-width">Login</button>
+      <div class="login-workspaces">
+        <button type="button" class="primary full-width" data-workspace="swk">Login to SWK</button>
+        <button type="button" class="primary full-width" data-workspace="betterway">Login to Betterway</button>
+      </div>
     </form>
   </div>
   </div>
@@ -75,7 +78,7 @@
   <header class="topbar">
     <div>
       <p class="eyebrow" id="todayLabel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3.5" y1="10" x2="20.5" y2="10"/></svg><span id="todayLabelText">Today</span></p>
-      <h1 id="pageTitle">Profile</h1>
+      <h1 id="pageTitle">Profile <span id="workspaceChip" class="workspace-chip hidden"></span></h1>
       <p class="topbar-tagline" id="pageTagline">Stay on top of your payments</p>
     </div>
     <div class="topbar-right">
@@ -314,7 +317,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v35</div>
+<div id="appVersion" class="app-version hidden">v36</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -418,6 +421,10 @@
       <h2>Settings</h2>
       <button id="closeSettingsBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
     </div>
+    <div id="workspaceSwitch" class="workspace-switch hidden">
+      <p class="hint" id="workspaceSwitchText"></p>
+      <button type="button" id="workspaceSwitchBtn" class="secondary full-width"></button>
+    </div>
     <form id="settingsForm">
       <label>Currency symbol
         <input type="text" id="currencySymbol" maxlength="4" style="max-width:80px">
@@ -485,6 +492,7 @@
           </label>
         </div>
         <button type="submit" class="secondary full-width">+ Add user</button>
+        <p class="hint" id="addUserHint"></p>
       </form>
       <p id="usersStatus" class="login-error hidden"></p>
     </div>

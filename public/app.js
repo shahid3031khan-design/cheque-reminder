@@ -204,7 +204,42 @@ function applyRoleUI() {
   $("#navRightIcon").innerHTML = admin ? ICONS.settings : ICONS.power;
   $("#navRightLabel").textContent = admin ? "Settings" : "Logout";
   $("#emptyHint").textContent = admin ? "Tap the + button below to add one." : "Nothing to show right now.";
+  applyWorkspaceUI();
 }
+
+// Shows which company is open, and (for admins, who can enter either) the switch in Settings.
+function applyWorkspaceUI() {
+  const user = state.currentUser;
+  const name = user.workspaceName || "";
+  const chip = $("#workspaceChip");
+  chip.textContent = name;
+  chip.classList.toggle("hidden", !name);
+
+  const others = (user.workspaces || []).filter((w) => w.key !== user.workspace);
+  const canSwitch = isAdmin() && others.length > 0;
+  $("#workspaceSwitch").classList.toggle("hidden", !canSwitch);
+  if (canSwitch) {
+    $("#workspaceSwitchText").textContent = `You're working in ${name}. Cheques, tasks and employees shown here belong to ${name} only.`;
+    $("#workspaceSwitchBtn").textContent = `Switch to ${others[0].name}`;
+    $("#workspaceSwitchBtn").dataset.workspace = others[0].key;
+  }
+  $("#addUserHint").textContent = name
+    ? `New employees are added to ${name}. Admins can sign in to both companies.`
+    : "";
+}
+
+$("#workspaceSwitchBtn").addEventListener("click", async () => {
+  const btn = $("#workspaceSwitchBtn");
+  btn.disabled = true;
+  try {
+    await api("/api/workspace", { method: "POST", body: JSON.stringify({ workspace: btn.dataset.workspace }) });
+    try { localStorage.setItem("lastWorkspace", btn.dataset.workspace); } catch {}
+    location.reload(); // start clean so nothing from the other company stays on screen
+  } catch (err) {
+    btn.disabled = false;
+    $("#settingsStatus").textContent = err.message || "Couldn't switch company.";
+  }
+});
 
 function switchView(view) {
   state.currentView = view;
@@ -233,8 +268,16 @@ $("#navRightBtn").addEventListener("click", () => {
 $("#settingsBtn").addEventListener("click", showSettings);
 $("#settingsLogoutBtn").addEventListener("click", doLogout);
 
-$("#loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+// Two companies share this app, each with its own cheques, tasks and staff. The button tapped says which one.
+function lastWorkspace() {
+  try {
+    const saved = localStorage.getItem("lastWorkspace");
+    if (saved === "swk" || saved === "betterway") return saved;
+  } catch {}
+  return "swk";
+}
+
+async function loginTo(workspace) {
   $("#loginError").classList.add("hidden");
   try {
     const user = await api("/api/login", {
@@ -243,8 +286,10 @@ $("#loginForm").addEventListener("submit", async (e) => {
         username: $("#loginUsername").value.trim(),
         password: $("#loginPassword").value,
         rememberMe: $("#rememberMe").checked,
+        workspace,
       }),
     });
+    try { localStorage.setItem("lastWorkspace", workspace); } catch {}
     state.currentUser = user;
     $("#loginForm").reset();
     $("#rememberMe").checked = true;
@@ -253,6 +298,28 @@ $("#loginForm").addEventListener("submit", async (e) => {
     $("#loginError").textContent = err.message || "Login failed.";
     $("#loginError").classList.remove("hidden");
   }
+}
+
+document.querySelectorAll(".login-workspaces button[data-workspace]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const form = $("#loginForm");
+    if (!form.reportValidity()) return; // username and password are required
+    loginTo(btn.dataset.workspace);
+  });
+});
+
+// Pressing Enter in a field signs in to the company used last time (SWK the very first time).
+$("#loginForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  loginTo(lastWorkspace());
+});
+["#loginUsername", "#loginPassword"].forEach((sel) => {
+  $(sel).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if ($("#loginForm").reportValidity()) loginTo(lastWorkspace());
+    }
+  });
 });
 
 $("#forgotPasswordLink").addEventListener("click", (e) => {

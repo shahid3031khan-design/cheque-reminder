@@ -12,6 +12,7 @@ const db = require("./lib/db");
 const auth = require("./lib/auth");
 const reminders = require("./lib/reminders");
 const push = require("./lib/push");
+const workspaces = require("./lib/workspaces");
 
 const app = express();
 const PORT = process.env.PORT || 8743;
@@ -74,18 +75,42 @@ function publicUser(u) {
   };
 }
 
+// The company this request is working in (chosen at sign-in; see lib/workspaces.js).
+function wsOf(req) {
+  return workspaces.workspaceOf(req.user);
+}
+
+function sessionInfo(user, workspace) {
+  return {
+    ...publicUser(user),
+    workspace,
+    workspaceName: workspaces.nameOf(workspace),
+    workspaces: workspaces.list(),
+    canSwitchWorkspace: user.role === "admin",
+  };
+}
+
 // ---------- Auth ----------
 
 app.post("/api/login", loginLimiter, async (req, res) => {
   const username = String(req.body.username || "").trim();
+  // Which company's button was tapped. Older screens (and the local app) send nothing: the person's own company.
+  const requested = req.body.workspace === undefined || req.body.workspace === null ? null : String(req.body.workspace);
+  if (requested !== null && !workspaces.isWorkspace(requested)) return res.status(400).json({ error: "Unknown company" });
+
   const user = await db.findUserByUsername(username);
   if (user && auth.checkPassword(req.body.password || "", user.passwordHash, user.passwordSalt)) {
+    const workspace = requested || workspaces.workspaceOf(user);
+    if (!workspaces.canEnter(user, workspace)) {
+      const home = workspaces.nameOf(user);
+      return res.status(403).json({ error: `This account doesn't have access to ${workspaces.nameOf(workspace)}. Use "Login to ${home}" instead.` });
+    }
     // Accounts created before the view-password feature only have a hash. We hold the plaintext right now
     // (they just typed it correctly), so store the encrypted copy and it becomes viewable to admins.
     if (!user.passwordEnc) await db.setUserPasswordEnc(user.id, auth.encryptPassword(req.body.password));
-    const { token, ttlMs } = auth.createSession(user, !!req.body.rememberMe);
+    const { token, ttlMs } = auth.createSession(user, !!req.body.rememberMe, workspace);
     setSessionCookie(res, token, ttlMs);
-    res.json(publicUser(user));
+    res.json(sessionInfo(user, workspace));
   } else {
     res.status(401).json({ error: "Invalid username or password" });
   }
@@ -98,7 +123,19 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", auth.requireAuth, (req, res) => {
-  res.json({ id: req.user.userId, username: req.user.username, role: req.user.role, displayName: req.user.displayName });
+  const workspace = wsOf(req);
+  res.json({
+    id: req.user.userId, username: req.user.username, role: req.user.role, displayName: req.user.displayName,
+    workspace, workspaceName: workspaces.nameOf(workspace), workspaces: workspaces.list(), canSwitchWorkspace: req.user.role === "admin",
+  });
+});
+
+// Admins can enter either company; this moves the current sign-in to the other one without signing out.
+app.post("/api/workspace", auth.requireAdmin, (req, res) => {
+  const key = String(req.body.workspace || "");
+  if (!workspaces.canEnter(req.user, key)) return res.status(400).json({ error: "Unknown company" });
+  auth.setSessionWorkspace(req.cookies?.session, key);
+  res.json({ workspace: key, workspaceName: workspaces.nameOf(key) });
 });
 
 app.get("/api/display-settings", auth.requireAuth, async (req, res) => {
@@ -202,10 +239,17 @@ app.post("/api/push/test", auth.requireAuth, async (req, res) => {
 
 // ---------- Users (admin only) ----------
 
+// The company's own employees plus every admin (admins can enter either company).
 app.get("/api/users", auth.requireAdmin, async (req, res) => {
-  const list = await db.getUsers();
+  const list = await db.getUsers(wsOf(req));
   res.json(list.map(publicUser));
 });
+
+// Admin screens may only act on people who are part of the company they're working in.
+async function findUserInWorkspace(req, id) {
+  const target = await db.findUserById(id);
+  return target && workspaces.isMember(target, wsOf(req)) ? target : null;
+}
 
 // Only the main admin (Shahid) adds users; sub admins get a pointer to him.
 // Caps: 1 main admin (Shahid himself - there can't be a second), 3 sub admins and 12 employees.
@@ -220,12 +264,14 @@ app.post("/api/users", auth.requireAdmin, async (req, res) => {
   if (await db.findUserByUsername(username)) return res.status(409).json({ error: "That username is already taken" });
 
   const role = req.body.role === "admin" ? "admin" : "employee";
-  const existing = await db.getUsers();
+  const workspace = wsOf(req);
+  // Admins are counted across the whole app; employees per company (the list is this company's staff + all admins).
+  const existing = await db.getUsers(workspace);
   if (role === "admin" && existing.filter((u) => u.role === "admin" && !auth.isMainAdmin(u)).length >= MAX_SUB_ADMINS) {
     return res.status(400).json({ error: `Maximum of ${MAX_SUB_ADMINS} sub admins reached` });
   }
   if (role === "employee" && existing.filter((u) => u.role === "employee").length >= MAX_EMPLOYEES) {
-    return res.status(400).json({ error: `Maximum of ${MAX_EMPLOYEES} employees reached` });
+    return res.status(400).json({ error: `Maximum of ${MAX_EMPLOYEES} employees reached in ${workspaces.nameOf(workspace)}` });
   }
   const pw = auth.newPasswordHash(password);
   const newUser = {
@@ -233,6 +279,7 @@ app.post("/api/users", auth.requireAdmin, async (req, res) => {
     username,
     displayName: req.body.displayName || username,
     role,
+    workspace, // an employee's company; for an admin it's just where they were created (they can enter either)
     passwordHash: pw.hash,
     passwordSalt: pw.salt,
     passwordEnc: auth.encryptPassword(password),
@@ -247,7 +294,7 @@ app.post("/api/users", auth.requireAdmin, async (req, res) => {
 app.get("/api/users/:id/password", auth.requireAuth, async (req, res) => {
   const isSelf = req.params.id === req.user.userId;
   if (!isSelf && req.user.role !== "admin") return res.status(403).json({ error: "You can only see your own password" });
-  const target = await db.findUserById(req.params.id);
+  const target = isSelf ? await db.findUserById(req.params.id) : await findUserInWorkspace(req, req.params.id);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (!isSelf && auth.isMainAdmin(target) && !auth.isMainAdmin(req.user)) {
     return res.status(403).json({ error: "Only Shahid can see the main admin's password" });
@@ -260,7 +307,7 @@ app.get("/api/users/:id/password", auth.requireAuth, async (req, res) => {
 
 app.put("/api/users/:id/password", auth.requireAdmin, async (req, res) => {
   if (!req.body.password) return res.status(400).json({ error: "Password is required" });
-  const target = await db.findUserById(req.params.id);
+  const target = await findUserInWorkspace(req, req.params.id);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (auth.isMainAdmin(target) && !auth.isMainAdmin(req.user)) {
     return res.status(403).json({ error: "Only Shahid can change the main admin's password" });
@@ -272,7 +319,7 @@ app.put("/api/users/:id/password", auth.requireAdmin, async (req, res) => {
 });
 
 app.delete("/api/users/:id", auth.requireAdmin, async (req, res) => {
-  const target = await db.findUserById(req.params.id);
+  const target = await findUserInWorkspace(req, req.params.id);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (auth.isMainAdmin(target)) return res.status(403).json({ error: "The main admin account can't be deleted" });
   if (target.role === "admin" && (await db.countAdmins()) <= 1) {
@@ -287,14 +334,21 @@ app.delete("/api/users/:id", auth.requireAdmin, async (req, res) => {
 // ---------- Cheques ----------
 
 app.get("/api/cheques", auth.requireAuth, async (req, res) => {
-  res.json(await db.getCheques());
+  res.json(await db.getCheques(wsOf(req)));
 });
+
+// A cheque from the other company is "not found" here, exactly as if it didn't exist.
+async function findChequeInWorkspace(req, id) {
+  const cheque = await db.findChequeById(id);
+  return cheque && workspaces.workspaceOf(cheque) === wsOf(req) ? cheque : null;
+}
 
 app.post("/api/cheques", auth.requireAdmin, async (req, res) => {
   const b = req.body;
   const cheque = {
     id: db.newId("c"),
     dealId: db.newId("d"),
+    workspace: wsOf(req),
     ownerName: b.ownerName, tenantName: b.tenantName, propertyDetail: b.propertyDetail, ownerBankDetail: b.ownerBankDetail,
     chequeNumber: b.chequeNumber, amount: b.amount, depositDate: b.depositDate, notes: b.notes,
     status: "pending", createdAt: new Date().toISOString(),
@@ -312,6 +366,7 @@ app.post("/api/cheques/batch", auth.requireAdmin, async (req, res) => {
   const created = rows.map((r) => ({
     id: db.newId("c"),
     dealId,
+    workspace: wsOf(req),
     ownerName: b.ownerName, tenantName: b.tenantName, propertyDetail: b.propertyDetail, ownerBankDetail: b.ownerBankDetail,
     chequeNumber: r.chequeNumber, amount: r.amount, depositDate: r.depositDate, notes: b.notes,
     status: "pending", createdAt: new Date().toISOString(),
@@ -326,7 +381,7 @@ app.put("/api/deals/:key", auth.requireAdmin, async (req, res) => {
   const rows = Array.isArray(b.cheques) ? b.cheques : [];
   if (rows.length === 0) return res.status(400).json({ error: "A deal needs at least one cheque" });
 
-  const allCheques = await db.getCheques();
+  const allCheques = await db.getCheques(wsOf(req)); // this company's only
   const existingGroup = allCheques.filter((c) => (c.dealId && c.dealId === key) || (!c.dealId && c.id === key));
   if (existingGroup.length === 0) return res.status(404).json({ error: "Deal not found" });
 
@@ -344,7 +399,7 @@ app.put("/api/deals/:key", auth.requireAdmin, async (req, res) => {
       keepCheques.push({ ...existing, ...sharedFields, chequeNumber: row.chequeNumber, amount: row.amount, depositDate: row.depositDate });
     } else {
       newCheques.push({
-        id: db.newId("c"), ...sharedFields,
+        id: db.newId("c"), workspace: wsOf(req), ...sharedFields,
         chequeNumber: row.chequeNumber, amount: row.amount, depositDate: row.depositDate,
         status: "pending", createdAt: new Date().toISOString(),
       });
@@ -356,12 +411,16 @@ app.put("/api/deals/:key", auth.requireAdmin, async (req, res) => {
 });
 
 app.put("/api/cheques/:id", auth.requireAdmin, async (req, res) => {
-  const updated = await db.updateCheque(req.params.id, req.body);
+  if (!(await findChequeInWorkspace(req, req.params.id))) return res.status(404).json({ error: "not found" });
+  // A cheque can't be moved to the other company by an edit.
+  const { workspace: _ignored, id: _id, ...fields } = req.body || {};
+  const updated = await db.updateCheque(req.params.id, fields);
   if (!updated) return res.status(404).json({ error: "not found" });
   res.json(updated);
 });
 
 app.delete("/api/cheques/:id", auth.requireAdmin, async (req, res) => {
+  if (!(await findChequeInWorkspace(req, req.params.id))) return res.status(404).json({ error: "not found" });
   await db.deleteCheque(req.params.id);
   res.json({ ok: true });
 });
@@ -541,21 +600,34 @@ const TASK_STATUSES = ["pending", "in_progress", "done"];
 
 app.get("/api/tasks", auth.requireAuth, async (req, res) => {
   if (req.user.role === "admin") {
-    res.json(await db.getTasks());
+    res.json(await db.getTasks(wsOf(req)));
   } else {
     res.json(await db.getTasksForUser(req.user.userId));
   }
 });
 
+// A task can only be given to people of the company it's in (that company's employees, or any admin).
+async function keepAssigneesInWorkspace(req, ids) {
+  const allowed = new Set((await db.getUsers(wsOf(req))).map((u) => u.id));
+  return ids.filter((id) => allowed.has(id));
+}
+
+async function findTaskInWorkspace(req, id) {
+  const task = await db.findTaskById(id);
+  return task && workspaces.workspaceOf(task) === wsOf(req) ? task : null;
+}
+
 app.post("/api/tasks", auth.requireAdmin, async (req, res) => {
   const b = req.body;
   const title = String(b.title || "").trim();
   if (!title) return res.status(400).json({ error: "Task title is required" });
-  const assignedTo = Array.isArray(b.assignedTo) ? b.assignedTo.filter((v) => typeof v === "string" && v).map(String) : [];
+  const requested = Array.isArray(b.assignedTo) ? b.assignedTo.filter((v) => typeof v === "string" && v).map(String) : [];
+  const assignedTo = await keepAssigneesInWorkspace(req, requested);
   if (assignedTo.length === 0) return res.status(400).json({ error: "Assign the task to at least one employee" });
   const priority = PRIORITIES.includes(b.priority) ? b.priority : "medium";
   const task = {
     id: db.newId("t"),
+    workspace: wsOf(req),
     title,
     description: String(b.description || "").slice(0, 5000),
     priority,
@@ -574,7 +646,7 @@ app.post("/api/tasks", auth.requireAdmin, async (req, res) => {
 });
 
 app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
-  const task = await db.findTaskById(req.params.id);
+  const task = req.user.role === "admin" ? await findTaskInWorkspace(req, req.params.id) : await db.findTaskById(req.params.id);
   if (!task) return res.status(404).json({ error: "Task not found" });
 
   if (req.user.role === "admin") {
@@ -583,7 +655,8 @@ app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
     if (req.body.description !== undefined) fields.description = String(req.body.description).slice(0, 5000);
     if (req.body.priority !== undefined && PRIORITIES.includes(req.body.priority)) fields.priority = req.body.priority;
     if (req.body.assignedTo !== undefined) {
-      const assignedTo = Array.isArray(req.body.assignedTo) ? req.body.assignedTo.filter((v) => typeof v === "string" && v).map(String) : [];
+      const requested = Array.isArray(req.body.assignedTo) ? req.body.assignedTo.filter((v) => typeof v === "string" && v).map(String) : [];
+      const assignedTo = await keepAssigneesInWorkspace(req, requested);
       if (assignedTo.length === 0) return res.status(400).json({ error: "Assign the task to at least one employee" });
       fields.assignedTo = assignedTo;
     }
@@ -621,6 +694,7 @@ app.put("/api/tasks/:id", auth.requireAuth, async (req, res) => {
 });
 
 app.delete("/api/tasks/:id", auth.requireAdmin, async (req, res) => {
+  if (!(await findTaskInWorkspace(req, req.params.id))) return res.status(404).json({ error: "Task not found" });
   await db.deleteTask(req.params.id);
   res.json({ ok: true });
 });

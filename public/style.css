@@ -723,6 +723,34 @@ select {
   margin: 0 0 12px;
 }
 
+/* One sign-in button per company */
+.login-workspaces {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Which company is open (next to the page title) and the switch in Settings */
+.workspace-chip {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow-soft);
+  color: var(--yellow-dark);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.workspace-switch {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: var(--yellow-soft);
+  border-radius: var(--radius);
+}
+.workspace-switch .hint { margin: 0 0 8px; color: var(--text); }
+
 .login-card .hint { margin-top: 18px; }
 
 /* ---------- Topbar user badge ---------- */
