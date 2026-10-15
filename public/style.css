@@ -1978,3 +1978,60 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .bottom-nav-inner, .nav-item .nav-icon svg, .nav-item, .nav-item .nav-label { transition: none; }
 }
+
+/* ---------- Cheque card actions: round, colour-coded buttons (replaces the hairline-divided strip) ---------- */
+.card-actions {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-left: 0;
+}
+.card-actions button {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-soft);
+  color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.card-actions button svg { width: 16px; height: 16px; }
+.card-actions button.action-deposit { background: var(--success-soft); color: var(--success); }
+.card-actions button[data-action="edit"] { background: var(--yellow-soft); color: var(--yellow-dark); }
+.card-actions button.action-delete { background: var(--red-soft); color: var(--red); }
+.card-actions button:hover { transform: scale(1.08); background: var(--gray-soft); }
+.card-actions button.action-deposit:hover { background: var(--success); color: #fff; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.35); }
+.card-actions button[data-action="edit"]:hover { background: var(--yellow); color: var(--yellow-text); box-shadow: 0 4px 10px rgba(108, 93, 211, 0.35); }
+.card-actions button.action-delete:hover { background: var(--red); color: #fff; box-shadow: 0 4px 10px rgba(232, 83, 110, 0.35); }
+.card-actions button:active { transform: scale(0.92); }
+
+/* the same treatment for the rows inside the deal sheet */
+.deal-cheque-row-actions { gap: 8px; }
+.deal-cheque-row-actions button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-soft);
+  color: var(--text-muted);
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+}
+.deal-cheque-row-actions button.action-deposit { background: var(--success-soft); color: var(--success); }
+.deal-cheque-row-actions button[data-action="edit"] { background: var(--yellow-soft); color: var(--yellow-dark); }
+.deal-cheque-row-actions button.action-delete { background: var(--red-soft); color: var(--red); }
+.deal-cheque-row-actions button:hover { transform: scale(1.08); }
+.deal-cheque-row-actions button.action-deposit:hover { background: var(--success); color: #fff; border-color: transparent; }
+.deal-cheque-row-actions button[data-action="edit"]:hover { background: var(--yellow); color: var(--yellow-text); }
+.deal-cheque-row-actions button.action-delete:hover { background: var(--red); color: #fff; border-color: transparent; }
+.deal-cheque-row-actions button:active { transform: scale(0.92); }
