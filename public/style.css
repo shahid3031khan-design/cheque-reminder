@@ -735,14 +735,24 @@ select {
   border-radius: 999px;
   border: 1px solid transparent;
 }
-.login-option-swk { background: #fde7e2; border-color: #f7cbc2; }
-.login-option-betterway { background: #ddf3ee; border-color: #b9e3d9; }
-.login-option-swk .login-swk { box-shadow: 0 6px 14px rgba(212, 56, 31, 0.28); }
-.login-option-betterway .login-betterway { box-shadow: 0 6px 14px rgba(15, 123, 108, 0.28); }
-.login-workspaces .login-swk { background: #d4381f; color: #fff; }        /* SWK: ember */
-.login-workspaces .login-swk:hover { background: #bd2f18; }
-.login-workspaces .login-betterway { background: #0f7b6c; color: #fff; }  /* Betterway: teal */
-.login-workspaces .login-betterway:hover { background: #0c6558; }
+.login-option-swk { background: #f4efe6; border-color: #ece2cf; }          /* SWK's cream and sand */
+.login-option-betterway { background: #e6eefe; border-color: #cadcfc; }    /* Betterway's light blue */
+.login-option-swk .login-swk { box-shadow: 0 6px 14px rgba(194, 58, 32, 0.30); }
+.login-option-betterway .login-betterway { box-shadow: inset 0 -3px 0 #c9a227, 0 6px 14px rgba(30, 39, 97, 0.30); }
+/* Each company's own brand colours: SWK = ember (from its website), Betterway = navy with gold (from its deck) */
+.login-workspaces .login-swk {
+  background: linear-gradient(135deg, #e8452c 0%, #c23a20 100%);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+.login-workspaces .login-swk:hover { background: linear-gradient(135deg, #d93e26 0%, #a9301a 100%); }
+.login-workspaces .login-betterway {
+  background: linear-gradient(135deg, #3b4a93 0%, #1e2761 100%);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 -3px 0 #c9a227; /* the gold edge */
+}
+.login-workspaces .login-betterway:hover { background: linear-gradient(135deg, #34428a 0%, #171f4f 100%); }
 
 /* Show / hide password on the sign-in page */
 .password-field { position: relative; display: block; }
@@ -784,8 +794,8 @@ select {
   font-weight: 700;
   letter-spacing: 0.02em;
 }
-.workspace-chip[data-workspace="swk"] { background: #fbe0da; color: #b2301b; }
-.workspace-chip[data-workspace="betterway"] { background: #d6efe9; color: #0c6558; }
+.workspace-chip[data-workspace="swk"] { background: #ffd9cc; color: #c23a20; }
+.workspace-chip[data-workspace="betterway"] { background: #cadcfc; color: #1e2761; }
 .workspace-switch {
   margin-bottom: 14px;
   padding: 12px 14px;
