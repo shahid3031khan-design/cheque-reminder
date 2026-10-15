@@ -904,6 +904,139 @@ app.delete("/api/meetings/:id", auth.requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- NOCs (SWK: PDF / image files of managements' No Objection Certificates) ----------
+
+const NOC_MAX_BYTES = 10 * 1024 * 1024;
+// The database's free plan is small, so total NOC storage stops at a cap (override with NOC_TOTAL_LIMIT_MB).
+const NOC_TOTAL_LIMIT = (Number(process.env.NOC_TOTAL_LIMIT_MB) || 300) * 1024 * 1024;
+
+// What a file really is, judged from its first bytes - never from its name or the type the browser claims.
+function sniffNocFile(buf) {
+  if (buf.length >= 5 && buf.toString("latin1", 0, 5) === "%PDF-") return { type: "application/pdf", ext: "pdf" };
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { type: "image/png", ext: "png" };
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { type: "image/jpeg", ext: "jpg" };
+  if (buf.length >= 12 && buf.toString("latin1", 0, 4) === "RIFF" && buf.toString("latin1", 8, 12) === "WEBP") return { type: "image/webp", ext: "webp" };
+  return null;
+}
+
+function requireSwk(req, res, next) {
+  if (wsOf(req) !== "swk") return res.status(403).json({ error: "NOCs belong to the SWK portal" });
+  next();
+}
+
+function cleanText(value, max) {
+  return String(value || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
+}
+
+function presentNoc(noc, usersById, viewer) {
+  const uploader = usersById.get(noc.uploadedBy);
+  return {
+    id: noc.id,
+    management: noc.management,
+    title: noc.title || "",
+    filename: noc.filename,
+    contentType: noc.contentType,
+    size: noc.size,
+    createdAt: noc.createdAt,
+    uploadedBy: { id: noc.uploadedBy, name: uploader ? visibleName(uploader, viewer.userId) : "Former user" },
+    canEdit: noc.uploadedBy === viewer.userId || viewer.role === "admin",
+  };
+}
+
+async function findNoc(req, id) {
+  const noc = await db.findNocById(id);
+  return noc && workspaces.workspaceOf(noc) === "swk" ? noc : null;
+}
+
+app.get("/api/nocs", auth.requireAuth, requireSwk, async (req, res) => {
+  const usersById = new Map((await db.getUsers()).map((u) => [u.id, u]));
+  const list = await db.getNocs("swk");
+  res.json(list.map((n) => presentNoc(n, usersById, req.user)));
+});
+
+// The file itself is the request body; its details travel in the query string.
+app.post("/api/nocs", auth.requireAuth, requireSwk, express.raw({ type: () => true, limit: NOC_MAX_BYTES }), async (req, res) => {
+  const body = req.body;
+  if (!Buffer.isBuffer(body) || body.length === 0) return res.status(400).json({ error: "Choose a file to add" });
+  const kind = sniffNocFile(body);
+  if (!kind) return res.status(400).json({ error: "Only PDF, PNG, JPG or WebP files can be added" });
+  const management = cleanText(req.query.management, 100);
+  if (!management) return res.status(400).json({ error: "Enter the management's name" });
+  if ((await db.nocStorageBytes()) + body.length > NOC_TOTAL_LIMIT) {
+    return res.status(413).json({ error: "NOC storage is full. Delete files that are no longer needed first." });
+  }
+  let filename = cleanText(req.query.filename, 150).replace(/[\\/]/g, "_") || `NOC.${kind.ext}`;
+  if (!/\.[A-Za-z0-9]{2,5}$/.test(filename)) filename += `.${kind.ext}`;
+  const meta = {
+    id: db.newId("n"),
+    workspace: "swk",
+    management,
+    title: cleanText(req.query.title, 150),
+    filename,
+    contentType: kind.type,
+    size: body.length,
+    uploadedBy: req.user.userId,
+    createdAt: new Date().toISOString(),
+  };
+  await db.createNoc(meta, body);
+  const usersById = new Map((await db.getUsers()).map((u) => [u.id, u]));
+  res.status(201).json(presentNoc(meta, usersById, req.user));
+});
+
+app.get("/api/nocs/:id/file", auth.requireAuth, requireSwk, async (req, res) => {
+  const noc = await findNoc(req, req.params.id);
+  const data = noc && (await db.getNocFile(noc.id));
+  if (!noc || !data) return res.status(404).json({ error: "File not found" });
+  const asciiName = noc.filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  res.set({
+    "Content-Type": noc.contentType,
+    "Content-Length": String(data.length),
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "private, max-age=300",
+    "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(noc.filename)}`,
+  });
+  res.send(data);
+});
+
+// Fix a typo in the management name or the note. Only the person who added it, or an admin.
+app.put("/api/nocs/:id", auth.requireAuth, requireSwk, async (req, res) => {
+  const noc = await findNoc(req, req.params.id);
+  if (!noc) return res.status(404).json({ error: "File not found" });
+  if (noc.uploadedBy !== req.user.userId && req.user.role !== "admin") {
+    return res.status(403).json({ error: "Only the person who added it (or an admin) can change it" });
+  }
+  const fields = {};
+  if (req.body?.management !== undefined) {
+    const management = cleanText(req.body.management, 100);
+    if (!management) return res.status(400).json({ error: "Enter the management's name" });
+    fields.management = management;
+  }
+  if (req.body?.title !== undefined) fields.title = cleanText(req.body.title, 150);
+  const updated = await db.updateNoc(noc.id, fields);
+  const usersById = new Map((await db.getUsers()).map((u) => [u.id, u]));
+  res.json(presentNoc(updated, usersById, req.user));
+});
+
+app.delete("/api/nocs/:id", auth.requireAuth, requireSwk, async (req, res) => {
+  const noc = await findNoc(req, req.params.id);
+  if (!noc) return res.status(404).json({ error: "File not found" });
+  if (noc.uploadedBy !== req.user.userId && req.user.role !== "admin") {
+    return res.status(403).json({ error: "Only the person who added it (or an admin) can delete it" });
+  }
+  await db.deleteNoc(noc.id);
+  res.json({ ok: true });
+});
+
+// Anything that goes wrong in a route comes back as JSON the app can show (a too-large upload most often).
+app.use((err, req, res, next) => {
+  if (err && err.type === "entity.too.large") {
+    return res.status(413).json({ error: "That file is too big. The limit is 10 MB per file." });
+  }
+  console.error("Request failed:", err);
+  if (res.headersSent) return next(err);
+  res.status(err && err.status ? err.status : 500).json({ error: "Something went wrong" });
+});
+
 // ---------- Boot ----------
 
 async function start() {

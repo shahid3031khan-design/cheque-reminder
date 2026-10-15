@@ -213,8 +213,9 @@ function applyRoleUI() {
   updateAddBtnVisibility();
   $("#navRightIcon").innerHTML = admin ? ICONS.settings : ICONS.power;
   $("#navRightLabel").textContent = admin ? "Settings" : "Logout";
-  // Admins already have the Settings gear at the top, so the bottom bar only keeps this slot for employees' Logout.
-  $("#navRightBtn").classList.toggle("hidden", admin);
+  // The bottom bar has no Settings or Logout button any more: admins use the gear at the top, and everyone can
+  // sign out from "My account" (tap your name at the top).
+  $("#navRightBtn").classList.add("hidden");
   $("#emptyHint").textContent = admin ? "Tap the + button below to add one." : "Nothing to show right now.";
   applyWorkspaceUI();
 }
@@ -246,10 +247,12 @@ function applyWorkspaceUI() {
   $("#trackerAchievementTab").classList.toggle("hidden", !betterway);
   if (state.trackerTab === (betterway ? "pipeline" : "achievement")) setTrackerTab("daily");
 
-  // The mortgage calculator is Betterway's only. Six items don't fit side by side, so the bar stacks icon over label.
+  // Each company has one tab of its own: the mortgage calculator (Betterway) and the NOCs (SWK). Six items don't
+  // fit side by side, so the bar stacks icon over label.
   $("#navMortgageBtn").classList.toggle("hidden", !betterway);
-  document.querySelector(".bottom-nav-inner").classList.toggle("nav-compact", betterway);
-  if (!betterway && state.currentView === "mortgage") switchView("home");
+  $("#navNocsBtn").classList.toggle("hidden", betterway);
+  document.querySelector(".bottom-nav-inner").classList.add("nav-compact");
+  if (state.currentView === (betterway ? "nocs" : "mortgage")) switchView("home");
 }
 
 $("#workspaceSwitchBtn").addEventListener("click", async () => {
@@ -266,14 +269,16 @@ $("#workspaceSwitchBtn").addEventListener("click", async () => {
 });
 
 function switchView(view) {
-  // The mortgage calculator belongs to Betterway only.
+  // The mortgage calculator belongs to Betterway only, and the NOCs to SWK only.
   if (view === "mortgage" && state.currentUser?.workspace !== "betterway") view = "home";
+  if (view === "nocs" && state.currentUser?.workspace !== "swk") view = "home";
   state.currentView = view;
   $("#homeView").classList.toggle("hidden", view !== "home");
   $("#trackerView").classList.toggle("hidden", view !== "tracker");
   $("#tasksView").classList.toggle("hidden", view !== "tasks");
   $("#callsView").classList.toggle("hidden", view !== "calls");
   $("#mortgageView").classList.toggle("hidden", view !== "mortgage");
+  $("#nocsView").classList.toggle("hidden", view !== "nocs");
   $("#pageTitle").classList.toggle("hidden", view !== "home");
   $("#pageTagline").classList.toggle("hidden", view !== "home");
   updateAddBtnVisibility();
@@ -284,6 +289,7 @@ function switchView(view) {
   if (view === "tasks") openTasksView();
   if (view === "calls") openCallsView();
   if (view === "mortgage") renderMortgage();
+  if (view === "nocs") loadNocs();
 }
 
 document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
@@ -1689,6 +1695,157 @@ $("#meetingForm").addEventListener("submit", async (e) => {
   }
 });
 
+// ---------- NOCs (SWK: PDF / image files of managements' No Objection Certificates) ----------
+
+const NOC_MAX_BYTES = 10 * 1024 * 1024;
+const NOC_EXTENSION_TYPES = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
+state.nocs = [];
+
+function nocFileKind(file) {
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  return NOC_EXTENSION_TYPES[ext] || (Object.values(NOC_EXTENSION_TYPES).includes(file.type) ? file.type : null);
+}
+
+function formatFileSize(bytes) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+async function loadNocs() {
+  try {
+    state.nocs = await api("/api/nocs");
+  } catch {
+    state.nocs = [];
+  }
+  renderNocs();
+}
+
+function renderNocs() {
+  const query = $("#nocSearch").value.trim().toLowerCase();
+  const matching = state.nocs.filter((n) => !query || `${n.management} ${n.title} ${n.filename}`.toLowerCase().includes(query));
+  $("#nocManagementList").innerHTML = [...new Set(state.nocs.map((n) => n.management))].sort((a, b) => a.localeCompare(b))
+    .map((m) => `<option value="${escapeHtml(m)}"></option>`).join("");
+  const list = $("#nocsList");
+  const empty = $("#nocsEmptyState");
+  if (matching.length === 0) {
+    list.innerHTML = query ? `<p class="hint noc-nomatch">Nothing matches "${escapeHtml(query)}".</p>` : "";
+    empty.classList.toggle("hidden", state.nocs.length > 0);
+    return;
+  }
+  empty.classList.add("hidden");
+
+  // One block per management (spelling/capitalisation differences are treated as the same management).
+  const groups = new Map();
+  for (const n of matching) {
+    const key = n.management.trim().toLowerCase();
+    if (!groups.has(key)) groups.set(key, { name: n.management, items: [] });
+    groups.get(key).items.push(n);
+  }
+  const pdfIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><polyline points="14 3 14 8 19 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>';
+  list.innerHTML = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name)).map((group) => `
+    <section class="noc-group">
+      <h3 class="noc-group-title">${escapeHtml(group.name)} <span>${group.items.length}</span></h3>
+      ${group.items.map((n) => {
+        const isImage = n.contentType.startsWith("image/");
+        const added = new Date(n.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+        return `
+        <div class="noc-card" data-id="${n.id}">
+          <a class="noc-open" href="/api/nocs/${n.id}/file" target="_blank" rel="noopener">
+            <span class="noc-thumb">${isImage ? `<img src="/api/nocs/${n.id}/file" alt="" loading="lazy">` : pdfIcon}</span>
+            <span class="noc-info">
+              <span class="noc-name">${escapeHtml(n.title || n.filename)}</span>
+              <span class="noc-meta">${isImage ? "Image" : "PDF"} · ${formatFileSize(n.size)} · ${escapeHtml(n.uploadedBy.name)} · ${added}</span>
+              ${n.title ? `<span class="noc-meta noc-file">${escapeHtml(n.filename)}</span>` : ""}
+            </span>
+          </a>
+          ${n.canEdit ? `<div class="noc-actions">
+            <button type="button" data-noc-action="edit" data-noc-id="${n.id}">Edit</button>
+            <button type="button" data-noc-action="delete" data-noc-id="${n.id}" class="danger">Delete</button>
+          </div>` : ""}
+        </div>`;
+      }).join("")}
+    </section>`).join("");
+}
+
+$("#nocSearch").addEventListener("input", renderNocs);
+
+$("#nocsList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-noc-action]");
+  if (!btn) return;
+  const noc = state.nocs.find((n) => n.id === btn.dataset.nocId);
+  if (!noc) return;
+  try {
+    if (btn.dataset.nocAction === "delete") {
+      if (!confirm(`Delete "${noc.title || noc.filename}"?`)) return;
+      await api(`/api/nocs/${noc.id}`, { method: "DELETE" });
+    } else {
+      const management = prompt("Management name", noc.management);
+      if (management === null) return;
+      const title = prompt("Note (optional)", noc.title);
+      if (title === null) return;
+      await api(`/api/nocs/${noc.id}`, { method: "PUT", body: JSON.stringify({ management, title }) });
+    }
+  } catch (err) {
+    alert(err.message || "That didn't work.");
+  }
+  await loadNocs();
+});
+
+function openNocModal() {
+  $("#nocForm").reset();
+  $("#nocStatus").textContent = "";
+  $("#nocSaveBtn").disabled = false;
+  $("#nocModal").classList.remove("hidden");
+}
+function closeNocModal() { $("#nocModal").classList.add("hidden"); }
+
+$("#addNocBtn").addEventListener("click", openNocModal);
+$("#closeNocBtn").addEventListener("click", closeNocModal);
+$("#cancelNocBtn").addEventListener("click", closeNocModal);
+$("#nocModal").addEventListener("click", (e) => { if (e.target.id === "nocModal") closeNocModal(); });
+
+$("#nocForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const management = $("#nocManagement").value.trim();
+  const title = $("#nocTitle").value.trim();
+  const files = [...$("#nocFiles").files];
+  const status = $("#nocStatus");
+  if (!management || files.length === 0) return;
+
+  // Check everything before uploading anything.
+  for (const file of files) {
+    if (!nocFileKind(file)) { status.textContent = `"${file.name}" isn't a PDF, PNG, JPG or WebP file.`; return; }
+    if (file.size > NOC_MAX_BYTES) { status.textContent = `"${file.name}" is ${formatFileSize(file.size)} - the limit is 10 MB per file.`; return; }
+  }
+
+  $("#nocSaveBtn").disabled = true;
+  const failed = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    status.textContent = files.length > 1 ? `Uploading ${i + 1} of ${files.length}...` : "Uploading...";
+    try {
+      const qs = new URLSearchParams({ management, filename: file.name });
+      if (title) qs.set("title", title);
+      const res = await fetch(`/api/nocs?${qs.toString()}`, { method: "POST", headers: { "Content-Type": nocFileKind(file) }, body: file });
+      if (res.status === 401) { location.reload(); return; }
+      if (!res.ok) {
+        let message = "Upload failed";
+        try { message = (await res.json()).error || message; } catch {}
+        failed.push(`${file.name}: ${message}`);
+      }
+    } catch {
+      failed.push(`${file.name}: no connection`);
+    }
+  }
+  $("#nocSaveBtn").disabled = false;
+  await loadNocs();
+  if (failed.length === 0) {
+    closeNocModal();
+  } else {
+    status.textContent = `Some files didn't upload - ${failed.join("; ")}`;
+  }
+});
+
 // ---------- Mortgage calculator (Betterway) ----------
 
 // Standard repayment mortgage: the same payment every month, interest charged on the balance left.
@@ -2247,6 +2404,7 @@ $("#userBadge").addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAccountModal(); }
 });
 $("#closeAccountBtn").addEventListener("click", closeAccountModal);
+$("#accountLogoutBtn").addEventListener("click", () => { closeAccountModal(); doLogout(); });
 $("#accountModal").addEventListener("click", (e) => {
   if (e.target.id === "accountModal") closeAccountModal();
 });

@@ -1,4 +1,4 @@
-const CACHE_NAME = "profile-shell-v4";
+const CACHE_NAME = "profile-shell-v5";
 const SHELL_ASSETS = ["/", "/style.css", "/app.js"];
 
 self.addEventListener("install", (event) => {
@@ -24,8 +24,10 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "Profile", {
       body: data.body || "",
-      icon: "/icon-192.png?v=2",
-      badge: "/icon-192.png?v=2",
+      // The logo cut to a circle (notification-icon.png), and the same infinity mark in plain white
+      // (notification-badge.png) for the phone's small status-bar icon, which only uses its shape.
+      icon: "/notification-icon.png?v=1",
+      badge: "/notification-badge.png?v=1",
       tag: data.tag || undefined,
       data: { url: data.url || "/" },
     })

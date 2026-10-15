@@ -289,6 +289,21 @@
     </div>
   </div>
 
+  <div id="nocsView" class="hidden">
+    <div class="tracker-header">
+      <h2>NOCs</h2>
+    </div>
+
+    <button type="button" id="addNocBtn" class="primary full-width">+ Add NOC</button>
+    <input type="search" id="nocSearch" class="noc-search" placeholder="Search by management or file name" aria-label="Search NOCs">
+    <p class="hint" id="nocsHint">PDF or image files (PNG, JPG, WebP), up to 10 MB each. Everyone in SWK can see them.</p>
+    <div id="nocsList"></div>
+    <div id="nocsEmptyState" class="empty-state hidden">
+      <p>No NOCs added yet.</p>
+      <p class="hint">Tap "Add NOC" to upload the first one.</p>
+    </div>
+  </div>
+
   <div id="mortgageView" class="hidden">
     <div class="tracker-header">
       <h2>Mortgage calculator</h2>
@@ -388,6 +403,10 @@
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 4 6a2 2 0 0 1 0-2Z"/></svg></span>
       <span class="nav-label">Calls</span>
     </button>
+    <button class="nav-item hidden" id="navNocsBtn" data-nav="nocs">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><polyline points="14 3 14 8 19 8"/><polyline points="9 14.5 11.2 16.7 15.2 12.3"/></svg></span>
+      <span class="nav-label">NOCs</span>
+    </button>
     <button class="nav-item hidden" id="navMortgageBtn" data-nav="mortgage">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="2.5"/><rect x="7.5" y="6" width="9" height="3.5" rx="1"/><circle cx="8.5" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="15.5" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/></svg></span>
       <span class="nav-label">Mortgage</span>
@@ -399,7 +418,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v40</div>
+<div id="appVersion" class="app-version hidden">v43</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -479,6 +498,34 @@
         <button type="button" id="cancelAddTaskBtn" class="secondary">Cancel</button>
       </div>
       <p id="addTaskStatus" class="login-error hidden"></p>
+    </form>
+  </div>
+</div>
+
+<div id="nocModal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2>Add NOC</h2>
+      <button id="closeNocBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <form id="nocForm">
+      <label>Management
+        <input type="text" id="nocManagement" required maxlength="100" list="nocManagementList" placeholder="e.g. the building or community management's name">
+        <datalist id="nocManagementList"></datalist>
+      </label>
+      <label>Note
+        <input type="text" id="nocTitle" maxlength="150" placeholder="optional - e.g. Tower B, valid until March">
+      </label>
+      <label>File
+        <input type="file" id="nocFiles" required multiple accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp">
+      </label>
+      <p class="hint">You can pick several files at once; each is added under this management.</p>
+      <div class="form-actions">
+        <button type="submit" id="nocSaveBtn" class="primary">Upload</button>
+        <button type="button" id="cancelNocBtn" class="secondary">Cancel</button>
+      </div>
+      <p id="nocStatus" class="hint noc-status"></p>
     </form>
   </div>
 </div>
@@ -758,6 +805,7 @@
     <div id="accountPw" class="user-row-pw hidden"></div>
     <p id="accountNote" class="hint hidden">To change your password, ask your admin to reset it.</p>
     <p id="accountStatus" class="hint"></p>
+    <button type="button" id="accountLogoutBtn" class="secondary full-width">Log out</button>
   </div>
 </div>
 
