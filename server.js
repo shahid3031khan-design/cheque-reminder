@@ -239,16 +239,33 @@ app.post("/api/push/test", auth.requireAuth, async (req, res) => {
 
 // ---------- Users (admin only) ----------
 
+// The main admin (the developer's account) isn't shown to anyone but himself: not in any list, and by the
+// neutral name "Admin" wherever his actions are shown to others.
+function isHiddenFrom(target, viewerUserId) {
+  return auth.isMainAdmin(target) && target.id !== viewerUserId;
+}
+function visibleName(target, viewerUserId) {
+  return isHiddenFrom(target, viewerUserId) ? "Admin" : (target.displayName || target.username);
+}
+
 // The company's own employees plus every admin (admins can enter either company).
 app.get("/api/users", auth.requireAdmin, async (req, res) => {
-  const list = await db.getUsers(wsOf(req));
+  const list = (await db.getUsers(wsOf(req))).filter((u) => !isHiddenFrom(u, req.user.userId));
   res.json(list.map(publicUser));
 });
 
-// Admin screens may only act on people who are part of the company they're working in.
+// Names for pickers (e.g. who to invite to a meeting). Open to everyone signed in, so only names and ids.
+app.get("/api/people", auth.requireAuth, async (req, res) => {
+  const list = (await db.getUsers(wsOf(req))).filter((u) => !isHiddenFrom(u, req.user.userId));
+  res.json(list.map((u) => ({ id: u.id, name: u.displayName || u.username, role: u.role })));
+});
+
+// Admin screens may only act on people who are part of the company they're working in (and never on the
+// main admin's account unless it's his own session).
 async function findUserInWorkspace(req, id) {
   const target = await db.findUserById(id);
-  return target && workspaces.isMember(target, wsOf(req)) ? target : null;
+  if (!target || !workspaces.isMember(target, wsOf(req))) return null;
+  return isHiddenFrom(target, req.user.userId) ? null : target;
 }
 
 // Only the main admin (Shahid) adds users; sub admins get a pointer to him.
@@ -442,17 +459,24 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const LEAVE_TYPES = ["sick", "annual", "casual", "other"];
 
-function resolveTrackerUserId(req) {
-  // Employees can only ever see their own tracker; admins may view anyone's via ?userId=
-  // Coerced to String so a crafted query string (e.g. ?userId[$ne]=null, which Express's
-  // query parser turns into an object) can never reach a MongoDB filter as an operator.
-  if (req.query.userId && req.user.role === "admin") return String(req.query.userId);
-  return req.user.userId;
+// Whose tracker / pipeline / calls this request is about. Employees only ever see their own; admins may view
+// someone else's via ?userId= - but only people of the company they're working in, and never the main admin's.
+// Returns null when that person isn't visible (answered as "not found").
+// The id is coerced to String so a crafted query string (e.g. ?userId[$ne]=null, which Express's query parser
+// turns into an object) can never reach a MongoDB filter as an operator.
+async function resolveViewedUserId(req) {
+  if (!req.query.userId || req.user.role !== "admin") return req.user.userId;
+  const id = String(req.query.userId);
+  if (id === req.user.userId) return id;
+  const target = await db.findUserById(id);
+  if (!target || !workspaces.isMember(target, wsOf(req)) || isHiddenFrom(target, req.user.userId)) return null;
+  return id;
 }
 
 app.get("/api/tracker/entries/:date", auth.requireAuth, async (req, res) => {
   if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
-  const userId = resolveTrackerUserId(req);
+  const userId = await resolveViewedUserId(req);
+  if (!userId) return res.status(404).json({ error: "User not found" });
   const entry = await db.getTrackerEntry(userId, req.params.date);
   res.json(entry || { userId, date: req.params.date, loginTime: "", plan: "", remarks: "", rating: null, logoutTime: "", onLeave: false, leaveType: "", leaveReason: "" });
 });
@@ -461,7 +485,8 @@ app.get("/api/tracker/month", auth.requireAuth, async (req, res) => {
   const year = parseInt(req.query.year, 10);
   const month = parseInt(req.query.month, 10);
   if (!year || !month || month < 1 || month > 12) return res.status(400).json({ error: "Invalid year/month" });
-  const userId = resolveTrackerUserId(req);
+  const userId = await resolveViewedUserId(req);
+  if (!userId) return res.status(404).json({ error: "User not found" });
   const entries = await db.getTrackerMonth(userId, year, month);
   res.json(entries);
 });
@@ -546,7 +571,8 @@ const PIPELINE_METRICS = {
 
 app.get("/api/tracker/pipeline/:month", auth.requireAuth, async (req, res) => {
   if (!MONTH_RE.test(req.params.month)) return res.status(400).json({ error: "Invalid month" });
-  const userId = resolveTrackerUserId(req);
+  const userId = await resolveViewedUserId(req);
+  if (!userId) return res.status(404).json({ error: "User not found" });
   const entry = await db.getPipeline(userId, req.params.month);
   if (entry) return res.json(entry);
   const empty = { userId, month: req.params.month };
@@ -590,6 +616,47 @@ app.put("/api/tracker/pipeline/:month", auth.requireAuth, async (req, res) => {
     fields.clientDetails = clients;
   }
   const entry = await db.upsertPipeline(req.user.userId, req.params.month, fields);
+  res.json(entry);
+});
+
+// ---------- Achievement (Betterway's monthly figures per person, in place of SWK's pipeline) ----------
+
+const ACHIEVEMENT_METRICS = {
+  expected: "Expected",
+  loggings: "Loggings",
+  valuation: "Valuation",
+  disbursement: "Disbursement",
+};
+
+app.get("/api/tracker/achievement/:month", auth.requireAuth, async (req, res) => {
+  if (!MONTH_RE.test(req.params.month)) return res.status(400).json({ error: "Invalid month" });
+  const userId = await resolveViewedUserId(req);
+  if (!userId) return res.status(404).json({ error: "User not found" });
+  const entry = await db.getAchievement(userId, req.params.month);
+  if (entry) return res.json(entry);
+  const empty = { userId, month: req.params.month };
+  for (const key of Object.keys(ACHIEVEMENT_METRICS)) { empty[key] = null; empty[`${key}Remark`] = ""; }
+  res.json(empty);
+});
+
+app.put("/api/tracker/achievement/:month", auth.requireAuth, async (req, res) => {
+  if (!MONTH_RE.test(req.params.month)) return res.status(400).json({ error: "Invalid month" });
+  // Always the logged-in user's own figures - admins can view others' but not edit them.
+  const fields = {};
+  for (const [key, label] of Object.entries(ACHIEVEMENT_METRICS)) {
+    const raw = req.body[key];
+    if (raw !== undefined) {
+      if (raw === null || raw === "") {
+        fields[key] = null;
+      } else {
+        const n = typeof raw === "number" || typeof raw === "string" ? Number(raw) : NaN;
+        if (!Number.isFinite(n) || n < 0 || n > 1e12) return res.status(400).json({ error: `${label} must be a number, 0 or more` });
+        fields[key] = n;
+      }
+    }
+    if (req.body[`${key}Remark`] !== undefined) fields[`${key}Remark`] = String(req.body[`${key}Remark`]).slice(0, 1000);
+  }
+  const entry = await db.upsertAchievement(req.user.userId, req.params.month, fields);
   res.json(entry);
 });
 
@@ -701,16 +768,10 @@ app.delete("/api/tasks/:id", auth.requireAdmin, async (req, res) => {
 
 // ---------- Calls (employee logs each call they make) ----------
 
-function resolveCallsUserId(req) {
-  // Employees can only ever see/add their own calls; admins may view anyone's via ?userId=
-  // Coerced to String for the same reason as resolveTrackerUserId above.
-  if (req.query.userId && req.user.role === "admin") return String(req.query.userId);
-  return req.user.userId;
-}
-
 app.get("/api/calls/day/:date", auth.requireAuth, async (req, res) => {
   if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: "Invalid date" });
-  const userId = resolveCallsUserId(req);
+  const userId = await resolveViewedUserId(req); // employees: their own; admins: anyone visible in this company
+  if (!userId) return res.status(404).json({ error: "User not found" });
   res.json(await db.getCallsForDay(userId, req.params.date));
 });
 
@@ -718,7 +779,8 @@ app.get("/api/calls/month", auth.requireAuth, async (req, res) => {
   const year = parseInt(req.query.year, 10);
   const month = parseInt(req.query.month, 10);
   if (!year || !month || month < 1 || month > 12) return res.status(400).json({ error: "Invalid year/month" });
-  const userId = resolveCallsUserId(req);
+  const userId = await resolveViewedUserId(req);
+  if (!userId) return res.status(404).json({ error: "User not found" });
   const entries = await db.getCallsMonth(userId, year, month);
   const byDate = {};
   for (const c of entries) {
@@ -759,6 +821,89 @@ app.delete("/api/calls/:id", auth.requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Meetings (anyone can schedule one; people get alerts at 1 hour, 30 and 15 minutes before) ----------
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// What the screens need: who's coming, who made it, and whether this viewer may cancel it.
+function presentMeeting(meeting, usersById, viewer) {
+  const named = (id) => {
+    const u = usersById.get(id);
+    return u ? { id, name: visibleName(u, viewer.userId) } : { id, name: "Former user" };
+  };
+  return {
+    id: meeting.id,
+    title: meeting.title,
+    date: meeting.date,
+    time: meeting.time,
+    location: meeting.location || "",
+    createdBy: named(meeting.createdBy),
+    attendees: (meeting.attendees || []).map(named),
+    canCancel: meeting.createdBy === viewer.userId || viewer.role === "admin",
+  };
+}
+
+// The meetings you scheduled or were invited to, in the company you're working in. Meetings that started more
+// than an hour ago drop off the list.
+app.get("/api/meetings", auth.requireAuth, async (req, res) => {
+  const mine = (await db.getMeetings(wsOf(req), todayKey())).filter((m) => {
+    const involved = m.createdBy === req.user.userId || (m.attendees || []).includes(req.user.userId);
+    return involved && reminders.meetingStart(m).getTime() + 60 * 60 * 1000 >= Date.now();
+  });
+  const usersById = new Map((await db.getUsers()).map((u) => [u.id, u]));
+  res.json(mine.map((m) => presentMeeting(m, usersById, req.user)));
+});
+
+app.post("/api/meetings", auth.requireAuth, async (req, res) => {
+  const b = req.body || {};
+  const title = String(b.title || "").trim().slice(0, 120);
+  if (!title) return res.status(400).json({ error: "Give the meeting a title" });
+  const date = String(b.date || "");
+  const time = String(b.time || "");
+  if (!DATE_RE.test(date) || !TIME_RE.test(time)) return res.status(400).json({ error: "Pick a date and a time" });
+  const meeting = {
+    id: db.newId("m"),
+    workspace: wsOf(req),
+    title,
+    date,
+    time,
+    location: String(b.location || "").trim().slice(0, 200),
+    createdBy: req.user.userId,
+    attendees: [],
+    createdAt: new Date().toISOString(),
+  };
+  if (reminders.meetingStart(meeting).getTime() <= Date.now()) return res.status(400).json({ error: "That time has already passed" });
+
+  // Invitees must be people of this company the creator can see; the creator is always part of it.
+  const people = (await db.getUsers(wsOf(req))).filter((u) => !isHiddenFrom(u, req.user.userId));
+  const allowed = new Set(people.map((u) => u.id));
+  const asked = Array.isArray(b.attendees) ? b.attendees.filter((v) => typeof v === "string") : [];
+  meeting.attendees = [...new Set(asked)].filter((id) => allowed.has(id) && id !== req.user.userId).slice(0, 50);
+
+  await db.createMeeting(meeting);
+  const allUsers = await db.getUsers();
+  const creator = allUsers.find((u) => u.id === req.user.userId) || { id: req.user.userId, username: req.user.username };
+  reminders.notifyMeetingInvited(meeting, creator, allUsers).catch((err) => console.error("Meeting invite failed:", err));
+  const usersById = new Map(allUsers.map((u) => [u.id, u]));
+  res.status(201).json(presentMeeting(meeting, usersById, req.user));
+});
+
+app.delete("/api/meetings/:id", auth.requireAuth, async (req, res) => {
+  const meeting = await db.findMeetingById(req.params.id);
+  if (!meeting || workspaces.workspaceOf(meeting) !== wsOf(req)) return res.status(404).json({ error: "Meeting not found" });
+  if (meeting.createdBy !== req.user.userId && req.user.role !== "admin") {
+    return res.status(403).json({ error: "Only the person who scheduled it (or an admin) can cancel it" });
+  }
+  await db.deleteMeeting(meeting.id);
+  const allUsers = await db.getUsers();
+  const who = allUsers.find((u) => u.id === req.user.userId) || { id: req.user.userId, username: req.user.username };
+  reminders.notifyMeetingCancelled(meeting, who, allUsers).catch((err) => console.error("Meeting cancel notice failed:", err));
+  res.json({ ok: true });
+});
+
 // ---------- Boot ----------
 
 async function start() {
@@ -777,6 +922,11 @@ async function start() {
   const attendanceSweep = () => reminders.runAttendanceReminderCheck().catch((err) => console.error("Attendance reminder failed:", err));
   cron.schedule("*/5 * * * *", attendanceSweep, { timezone: process.env.TZ });
   setTimeout(attendanceSweep, 20 * 1000);
+
+  // Meeting reminders (1 hour, 30 and 15 minutes before): checked every minute so they arrive on time.
+  const meetingSweep = () => reminders.runMeetingReminderCheck().catch((err) => console.error("Meeting reminder failed:", err));
+  cron.schedule("* * * * *", meetingSweep, { timezone: process.env.TZ });
+  setTimeout(meetingSweep, 25 * 1000);
 
   app.listen(PORT, () => {
     console.log(`Cheque Reminder (cloud) listening on port ${PORT}`);

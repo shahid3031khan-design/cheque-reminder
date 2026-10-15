@@ -20,7 +20,10 @@ const state = {
   pipelineEntry: null,
   pipelineClientDetails: [],
   pipelineOpenClients: new Set(),
+  achievementEntry: null,
   revealedPasswords: {},
+  tasksTab: "tasks",
+  meetings: [],
   tasks: [],
   taskEmployees: [],
   taskEmployeesLoaded: false,
@@ -171,6 +174,13 @@ randomizeLoginClipart();
 // ---------- Auth / bootstrap ----------
 
 function showLoginScreen() {
+  // Someone was signed in on this page (logged out, or their session ended): start the page afresh so nothing of
+  // theirs (people lists, the tracker's person picker, figures) is left for whoever signs in next.
+  if (state.currentUser) {
+    state.currentUser = null;
+    location.reload();
+    return;
+  }
   state.currentUser = null;
   state.revealedPasswords = {};
   randomizeLoginClipart();
@@ -186,7 +196,7 @@ function showApp() {
 
 function updateAddBtnVisibility() {
   const view = state.currentView;
-  const show = isAdmin() && (view === "home" || view === "tasks");
+  const show = isAdmin() && (view === "home" || (view === "tasks" && state.tasksTab === "tasks"));
   const btn = $("#addBtn");
   btn.classList.toggle("hidden", !show);
   const text = view === "tasks" ? "Add Task" : "Add Cheques";
@@ -203,6 +213,8 @@ function applyRoleUI() {
   updateAddBtnVisibility();
   $("#navRightIcon").innerHTML = admin ? ICONS.settings : ICONS.power;
   $("#navRightLabel").textContent = admin ? "Settings" : "Logout";
+  // Admins already have the Settings gear at the top, so the bottom bar only keeps this slot for employees' Logout.
+  $("#navRightBtn").classList.toggle("hidden", admin);
   $("#emptyHint").textContent = admin ? "Tap the + button below to add one." : "Nothing to show right now.";
   applyWorkspaceUI();
 }
@@ -227,6 +239,12 @@ function applyWorkspaceUI() {
   $("#addUserHint").textContent = name
     ? `New employees are added to ${name}. Admins can sign in to both companies.`
     : "";
+
+  // SWK tracks a Pipeline; Betterway tracks its Achievement (Expected / Loggings / Valuation / Disbursement).
+  const betterway = user.workspace === "betterway";
+  $("#trackerPipelineTab").classList.toggle("hidden", betterway);
+  $("#trackerAchievementTab").classList.toggle("hidden", !betterway);
+  if (state.trackerTab === (betterway ? "pipeline" : "achievement")) setTrackerTab("daily");
 }
 
 $("#workspaceSwitchBtn").addEventListener("click", async () => {
@@ -367,7 +385,12 @@ async function bootstrapApp() {
 function handleDeepLink() {
   const go = new URLSearchParams(location.search).get("go");
   if (!go) return;
-  if (["tracker", "tasks", "calls"].includes(go)) switchView(go);
+  if (go === "meetings") {
+    switchView("tasks");
+    setTasksTab("meetings");
+  } else if (["tracker", "tasks", "calls"].includes(go)) {
+    switchView(go);
+  }
   history.replaceState(null, "", location.pathname);
 }
 
@@ -735,7 +758,13 @@ async function openTrackerView() {
   await loadTrackerMonthEntries();
   renderTrackerCalendar();
   await selectTrackerDay(state.trackerSelectedDate);
+  await loadTrackerProgress();
+}
+
+// The monthly figures tab that's open (SWK's Pipeline or Betterway's Achievement) follows the person/month shown.
+async function loadTrackerProgress() {
   if (state.trackerTab === "pipeline") await loadPipeline();
+  else if (state.trackerTab === "achievement") await loadAchievement();
 }
 
 async function loadTrackerEmployeeOptions() {
@@ -752,7 +781,7 @@ $("#trackerEmployeeSelect").addEventListener("change", async (e) => {
   await loadTrackerMonthEntries();
   renderTrackerCalendar();
   await selectTrackerDay(state.trackerSelectedDate);
-  if (state.trackerTab === "pipeline") await loadPipeline();
+  await loadTrackerProgress();
 });
 
 async function loadTrackerMonthEntries() {
@@ -811,13 +840,15 @@ async function shiftTrackerMonth(delta) {
   if (state.trackerMonth > 12) { state.trackerMonth = 1; state.trackerYear += 1; }
   await loadTrackerMonthEntries();
   renderTrackerCalendar();
-  if (state.trackerTab === "pipeline") await loadPipeline();
+  await loadTrackerProgress();
 }
 
 $("#trackerPrevMonth").addEventListener("click", () => shiftTrackerMonth(-1));
 $("#trackerNextMonth").addEventListener("click", () => shiftTrackerMonth(1));
 $("#pipelinePrevMonth").addEventListener("click", () => shiftTrackerMonth(-1));
 $("#pipelineNextMonth").addEventListener("click", () => shiftTrackerMonth(1));
+$("#achievementPrevMonth").addEventListener("click", () => shiftTrackerMonth(-1));
+$("#achievementNextMonth").addEventListener("click", () => shiftTrackerMonth(1));
 
 async function selectTrackerDay(dateStr) {
   state.trackerSelectedDate = dateStr;
@@ -1211,7 +1242,9 @@ function setTrackerTab(tab) {
   document.querySelectorAll(".tracker-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.trackerTab === tab));
   $("#trackerDailyPane").classList.toggle("hidden", tab !== "daily");
   $("#trackerPipelinePane").classList.toggle("hidden", tab !== "pipeline");
+  $("#trackerAchievementPane").classList.toggle("hidden", tab !== "achievement");
   if (tab === "pipeline") loadPipeline();
+  if (tab === "achievement") loadAchievement();
 }
 
 document.querySelectorAll(".tracker-tab").forEach((btn) => {
@@ -1243,6 +1276,73 @@ $("#pipelineForm").addEventListener("submit", async (e) => {
 });
 
 renderPipelineForm();
+
+// ---------- Achievement (Betterway's monthly figures per person; the counterpart of SWK's Pipeline) ----------
+
+const ACHIEVEMENT_METRICS = [
+  { key: "expected", label: "Expected", badge: "badge-blue",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>' },
+  { key: "loggings", label: "Loggings", badge: "badge-purple",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><polyline points="14 3 14 8 19 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>' },
+  { key: "valuation", label: "Valuation", badge: "badge-coral",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-9"/><line x1="9.5" y1="15" x2="14.5" y2="15"/></svg>' },
+  { key: "disbursement", label: "Disbursement", badge: "badge-mint",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/></svg>' },
+];
+
+function renderAchievementForm() {
+  $("#achievementMetrics").innerHTML = ACHIEVEMENT_METRICS.map((m) => `
+    <div class="tracker-section pipeline-metric">
+      <div class="pipeline-metric-head">
+        <span class="stat-icon-badge ${m.badge}">${m.icon}</span>
+        <span class="pipeline-metric-title">${m.label}</span>
+        <input type="number" id="achievement-${m.key}" min="0" step="any" inputmode="decimal" placeholder="0" aria-label="${m.label}">
+      </div>
+      <textarea id="achievement-${m.key}Remark" rows="2" maxlength="1000" placeholder="Add a remark..." aria-label="Remark for ${m.label}"></textarea>
+    </div>`).join("");
+}
+
+function fillAchievementForm() {
+  const entry = state.achievementEntry || {};
+  const readOnly = !isViewingOwnTracker();
+  $("#achievementMonthLabel").textContent = new Date(state.trackerYear, state.trackerMonth - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  ACHIEVEMENT_METRICS.forEach((m) => {
+    const value = $(`#achievement-${m.key}`), remark = $(`#achievement-${m.key}Remark`);
+    value.value = entry[m.key] ?? "";
+    remark.value = entry[`${m.key}Remark`] || "";
+    value.disabled = readOnly;
+    remark.disabled = readOnly;
+  });
+  $("#achievementSaveBtn").classList.toggle("hidden", readOnly);
+  $("#achievementStatus").textContent = "";
+}
+
+async function loadAchievement() {
+  const uid = trackerUserIdParam();
+  state.achievementEntry = await api(`/api/tracker/achievement/${trackerMonthKey()}${uid ? `?userId=${encodeURIComponent(uid)}` : ""}`);
+  fillAchievementForm();
+}
+
+$("#achievementForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = {};
+  ACHIEVEMENT_METRICS.forEach((m) => {
+    const raw = $(`#achievement-${m.key}`).value.trim();
+    body[m.key] = raw === "" ? null : Number(raw);
+    body[`${m.key}Remark`] = $(`#achievement-${m.key}Remark`).value;
+  });
+  $("#achievementStatus").textContent = "Saving...";
+  try {
+    state.achievementEntry = await api(`/api/tracker/achievement/${trackerMonthKey()}`, { method: "PUT", body: JSON.stringify(body) });
+    fillAchievementForm();
+    $("#achievementStatus").textContent = "Saved.";
+  } catch (err) {
+    $("#achievementStatus").textContent = err.message;
+  }
+  setTimeout(() => { $("#achievementStatus").textContent = ""; }, 2500);
+});
+
+renderAchievementForm();
 
 function renderTrackerRatingStars(rating, readOnly) {
   const starIcon = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><polygon points="12 2.5 15.1 9 22 10 17 15 18.2 22 12 18.6 5.8 22 7 15 2 10 8.9 9"/></svg>';
@@ -1456,6 +1556,127 @@ $("#addTaskForm").addEventListener("submit", async (e) => {
   } catch (err) {
     $("#addTaskStatus").textContent = err.message || "Failed to create task.";
     $("#addTaskStatus").classList.remove("hidden");
+  }
+});
+
+// ---------- Meetings (anyone can schedule one; alerts at 1 hour, 30 and 15 minutes before) ----------
+
+function setTasksTab(tab) {
+  state.tasksTab = tab;
+  document.querySelectorAll(".tasks-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.tasksTab === tab));
+  $("#tasksPane").classList.toggle("hidden", tab !== "tasks");
+  $("#meetingsPane").classList.toggle("hidden", tab !== "meetings");
+  updateAddBtnVisibility();
+  if (tab === "meetings") loadMeetings();
+}
+
+document.querySelectorAll(".tasks-tab").forEach((btn) => {
+  btn.addEventListener("click", () => setTasksTab(btn.dataset.tasksTab));
+});
+
+async function loadMeetings() {
+  try {
+    state.meetings = await api("/api/meetings");
+  } catch {
+    state.meetings = [];
+  }
+  renderMeetings();
+}
+
+function formatMeetingDay(date) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+function formatMeetingTime(time) {
+  return new Date(`2000-01-01T${time}:00`).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function renderMeetings() {
+  const list = $("#meetingsList");
+  const empty = $("#meetingsEmptyState");
+  if (state.meetings.length === 0) {
+    list.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  const me = state.currentUser.id;
+  list.innerHTML = state.meetings.map((m) => {
+    const scheduledBy = m.createdBy.id === me ? "you" : escapeHtml(m.createdBy.name);
+    const people = m.attendees.map((a) => escapeHtml(a.id === me ? "You" : a.name));
+    return `
+      <div class="task-card meeting-card" data-id="${m.id}">
+        <div class="task-card-top">
+          <span class="badge meeting-when">${escapeHtml(formatMeetingDay(m.date))}</span>
+          <span class="task-due">${escapeHtml(formatMeetingTime(m.time))}</span>
+        </div>
+        <h3 class="task-title">${escapeHtml(m.title)}</h3>
+        ${m.location ? `<p class="task-desc">${escapeHtml(m.location)}</p>` : ""}
+        ${people.length ? `<p class="task-assignees">With ${people.join(", ")}</p>` : ""}
+        <p class="meeting-by">Scheduled by ${scheduledBy}</p>
+        ${m.canCancel ? `<button type="button" class="task-delete-btn" data-meeting-id="${m.id}">Cancel meeting</button>` : ""}
+      </div>`;
+  }).join("");
+}
+
+$("#meetingsList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-meeting-id]");
+  if (!btn) return;
+  if (!confirm("Cancel this meeting? Everyone invited will be told.")) return;
+  try {
+    await api(`/api/meetings/${btn.dataset.meetingId}`, { method: "DELETE" });
+  } catch (err) {
+    alert(err.message || "Couldn't cancel the meeting.");
+  }
+  await loadMeetings();
+});
+
+async function openMeetingModal() {
+  $("#meetingForm").reset();
+  $("#meetingDate").min = todayStr();
+  $("#meetingDate").value = todayStr();
+  $("#meetingStatus").classList.add("hidden");
+  let people = [];
+  try { people = await api("/api/people"); } catch {}
+  const others = people.filter((p) => p.id !== state.currentUser.id);
+  $("#meetingAttendees").innerHTML = others.map((p) => `
+    <label class="assignee-chip">
+      <input type="checkbox" value="${p.id}">
+      <span>${escapeHtml(p.name)}</span>
+    </label>`).join("");
+  $("#meetingAttendeesHint").textContent = others.length
+    ? "Optional. You get the reminders either way."
+    : "No one else is in your company yet - the reminders will go to you.";
+  $("#meetingModal").classList.remove("hidden");
+}
+
+function closeMeetingModal() { $("#meetingModal").classList.add("hidden"); }
+
+$("#scheduleMeetingBtn").addEventListener("click", openMeetingModal);
+$("#closeMeetingBtn").addEventListener("click", closeMeetingModal);
+$("#cancelMeetingBtn").addEventListener("click", closeMeetingModal);
+$("#meetingModal").addEventListener("click", (e) => { if (e.target.id === "meetingModal") closeMeetingModal(); });
+
+$("#meetingForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#meetingStatus").classList.add("hidden");
+  const attendees = [...document.querySelectorAll("#meetingAttendees input:checked")].map((i) => i.value);
+  try {
+    await api("/api/meetings", {
+      method: "POST",
+      body: JSON.stringify({
+        title: $("#meetingTitle").value.trim(),
+        date: $("#meetingDate").value,
+        time: $("#meetingTime").value,
+        location: $("#meetingLocation").value.trim(),
+        attendees,
+      }),
+    });
+    closeMeetingModal();
+    await loadMeetings();
+  } catch (err) {
+    $("#meetingStatus").textContent = err.message || "Couldn't schedule the meeting.";
+    $("#meetingStatus").classList.remove("hidden");
   }
 });
 
@@ -1960,11 +2181,10 @@ function iAmMainAdmin() {
 
 function renderUsers() {
   const viewerIsMain = iAmMainAdmin();
-  const mainCount = state.users.filter((u) => u.isMainAdmin).length;
   const subAdminCount = state.users.filter((u) => u.role === "admin" && !u.isMainAdmin).length;
   const employeeCount = state.users.filter((u) => u.role === "employee").length;
+  // (The main admin isn't counted or shown here: nobody else can see that account.)
   $("#usersCounts").innerHTML =
-    `<span>Main admin ${mainCount}/1</span>` +
     `<span class="${subAdminCount >= MAX_SUB_ADMINS ? "full" : ""}">Sub admins ${subAdminCount}/${MAX_SUB_ADMINS}</span>` +
     `<span class="${employeeCount >= MAX_EMPLOYEES ? "full" : ""}">Employees ${employeeCount}/${MAX_EMPLOYEES}</span>`;
 

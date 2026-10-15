@@ -1355,7 +1355,8 @@ select {
   border: 1px solid var(--glass-border);
   border-radius: 14px;
 }
-.tracker-tab {
+.tracker-tab,
+.tasks-tab {
   flex: 1;
   border: none;
   background: transparent;
@@ -1367,7 +1368,14 @@ select {
   color: var(--text-muted);
   cursor: pointer;
 }
-.tracker-tab.active { background: var(--yellow); color: var(--yellow-text); }
+.tracker-tab.active,
+.tasks-tab.active { background: var(--yellow); color: var(--yellow-text); }
+
+/* Meetings (under Tasks) */
+#scheduleMeetingBtn { margin-bottom: 4px; }
+.meetings-hint { margin: 6px 2px 14px; }
+.meeting-when { background: var(--yellow-soft); color: var(--yellow-dark); }
+.meeting-by { margin: 4px 0 8px; font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
 
 /* Pipeline: one block per metric - icon, title, count, then a remark box */
 .pipeline-metric-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
@@ -1388,6 +1396,8 @@ select {
 }
 .pipeline-metric-head input[type="number"]:focus { outline: none; border-color: var(--yellow); }
 .pipeline-metric-head input[type="number"]:disabled { opacity: 0.65; }
+/* Achievement figures can be amounts (e.g. a disbursement), so their boxes are wider and shrink the text a little */
+#achievementMetrics .pipeline-metric-head input[type="number"] { width: 138px; font-size: 1.05rem; padding: 8px 6px; }
 .pipeline-metric textarea { margin-bottom: 0; }
 
 /* Sub-category under "Clients in process": one remark per client */

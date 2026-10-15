@@ -156,7 +156,8 @@
 
     <div class="tracker-tabs" id="trackerTabs">
       <button type="button" class="tracker-tab active" data-tracker-tab="daily">Daily log</button>
-      <button type="button" class="tracker-tab" data-tracker-tab="pipeline">Pipeline</button>
+      <button type="button" class="tracker-tab" id="trackerPipelineTab" data-tracker-tab="pipeline">Pipeline</button>
+      <button type="button" class="tracker-tab hidden" id="trackerAchievementTab" data-tracker-tab="achievement">Achievement</button>
     </div>
 
     <div id="trackerDailyPane">
@@ -241,6 +242,21 @@
         </form>
       </div>
     </div>
+
+    <div id="trackerAchievementPane" class="hidden">
+      <div class="tracker-day-panel">
+        <div class="tracker-cal-nav pipeline-nav">
+          <button type="button" id="achievementPrevMonth" class="icon-btn" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg></button>
+          <span id="achievementMonthLabel">Month Year</span>
+          <button type="button" id="achievementNextMonth" class="icon-btn" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+        </div>
+        <form id="achievementForm">
+          <div id="achievementMetrics"></div>
+          <button type="submit" id="achievementSaveBtn" class="primary full-width">Save achievement</button>
+          <p id="achievementStatus" class="hint"></p>
+        </form>
+      </div>
+    </div>
   </div>
 
   <div id="tasksView" class="hidden">
@@ -248,11 +264,28 @@
       <h2>Tasks</h2>
     </div>
 
-    <p id="tasksNote" class="tasks-note hidden" role="status"></p>
-    <div class="tasks-list" id="tasksList"></div>
-    <div id="tasksEmptyState" class="empty-state hidden">
-      <p>No tasks yet.</p>
-      <p class="hint">Admin can add one from the + button below.</p>
+    <div class="tracker-tabs" id="tasksTabs">
+      <button type="button" class="tasks-tab active" data-tasks-tab="tasks">Tasks</button>
+      <button type="button" class="tasks-tab" data-tasks-tab="meetings">Meetings</button>
+    </div>
+
+    <div id="tasksPane">
+      <p id="tasksNote" class="tasks-note hidden" role="status"></p>
+      <div class="tasks-list" id="tasksList"></div>
+      <div id="tasksEmptyState" class="empty-state hidden">
+        <p>No tasks yet.</p>
+        <p class="hint">Admin can add one from the + button below.</p>
+      </div>
+    </div>
+
+    <div id="meetingsPane" class="hidden">
+      <button type="button" id="scheduleMeetingBtn" class="primary full-width">+ Schedule a meeting</button>
+      <p class="hint meetings-hint">Everyone invited, and you, get an alert 1 hour, 30 minutes and 15 minutes before it starts.</p>
+      <div class="tasks-list" id="meetingsList"></div>
+      <div id="meetingsEmptyState" class="empty-state hidden">
+        <p>No upcoming meetings.</p>
+        <p class="hint">Tap "Schedule a meeting" to add one.</p>
+      </div>
     </div>
   </div>
 
@@ -327,7 +360,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v37</div>
+<div id="appVersion" class="app-version hidden">v38</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
@@ -407,6 +440,42 @@
         <button type="button" id="cancelAddTaskBtn" class="secondary">Cancel</button>
       </div>
       <p id="addTaskStatus" class="login-error hidden"></p>
+    </form>
+  </div>
+</div>
+
+<div id="meetingModal" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <h2>Schedule a meeting</h2>
+      <button id="closeMeetingBtn" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    </div>
+    <form id="meetingForm">
+      <label>Title
+        <input type="text" id="meetingTitle" required maxlength="120" placeholder="e.g. Weekly team sync">
+      </label>
+      <div class="form-row">
+        <label>Date
+          <input type="date" id="meetingDate" required>
+        </label>
+        <label>Time
+          <input type="time" id="meetingTime" required>
+        </label>
+      </div>
+      <label>Place or link
+        <input type="text" id="meetingLocation" maxlength="200" placeholder="optional - e.g. Boardroom, Zoom link">
+      </label>
+
+      <div class="tracker-section-label">Invite</div>
+      <div class="assignee-select" id="meetingAttendees"></div>
+      <p class="hint" id="meetingAttendeesHint"></p>
+
+      <div class="form-actions">
+        <button type="submit" class="primary">Schedule</button>
+        <button type="button" id="cancelMeetingBtn" class="secondary">Cancel</button>
+      </div>
+      <p id="meetingStatus" class="login-error hidden"></p>
     </form>
   </div>
 </div>
