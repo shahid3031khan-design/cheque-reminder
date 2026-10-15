@@ -723,12 +723,53 @@ select {
   margin: 0 0 12px;
 }
 
-/* One sign-in button per company */
+/* One sign-in button per company, each in its own colour */
 .login-workspaces {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
+/* A soft band in a light shade of each button's own colour sits around it */
+.login-option {
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.login-option-swk { background: #fde7e2; border-color: #f7cbc2; }
+.login-option-betterway { background: #ddf3ee; border-color: #b9e3d9; }
+.login-option-swk .login-swk { box-shadow: 0 6px 14px rgba(212, 56, 31, 0.28); }
+.login-option-betterway .login-betterway { box-shadow: 0 6px 14px rgba(15, 123, 108, 0.28); }
+.login-workspaces .login-swk { background: #d4381f; color: #fff; }        /* SWK: ember */
+.login-workspaces .login-swk:hover { background: #bd2f18; }
+.login-workspaces .login-betterway { background: #0f7b6c; color: #fff; }  /* Betterway: teal */
+.login-workspaces .login-betterway:hover { background: #0c6558; }
+
+/* Show / hide password on the sign-in page */
+.password-field { position: relative; display: block; }
+.password-field input { width: 100%; padding-right: 48px; }
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.password-toggle:hover, .password-toggle:focus-visible { color: var(--yellow-dark); background: var(--yellow-soft); }
+.password-toggle svg { width: 20px; height: 20px; }
+.password-toggle .eye-off { display: none; }
+.password-toggle[aria-pressed="true"] .eye-on { display: none; }
+.password-toggle[aria-pressed="true"] .eye-off { display: block; }
 
 /* Which company is open (next to the page title) and the switch in Settings */
 .workspace-chip {
@@ -743,6 +784,8 @@ select {
   font-weight: 700;
   letter-spacing: 0.02em;
 }
+.workspace-chip[data-workspace="swk"] { background: #fbe0da; color: #b2301b; }
+.workspace-chip[data-workspace="betterway"] { background: #d6efe9; color: #0c6558; }
 .workspace-switch {
   margin-bottom: 14px;
   padding: 12px 14px;

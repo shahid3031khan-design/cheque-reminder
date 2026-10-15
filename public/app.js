@@ -213,6 +213,7 @@ function applyWorkspaceUI() {
   const name = user.workspaceName || "";
   const chip = $("#workspaceChip");
   chip.textContent = name;
+  chip.dataset.workspace = user.workspace || "";
   chip.classList.toggle("hidden", !name);
 
   const others = (user.workspaces || []).filter((w) => w.key !== user.workspace);
@@ -267,6 +268,21 @@ $("#navRightBtn").addEventListener("click", () => {
 });
 $("#settingsBtn").addEventListener("click", showSettings);
 $("#settingsLogoutBtn").addEventListener("click", doLogout);
+
+// Eye button on the password field: show what you typed, or hide it again. Always starts hidden.
+function setPasswordVisible(visible) {
+  const input = $("#loginPassword");
+  const btn = $("#togglePasswordBtn");
+  input.type = visible ? "text" : "password";
+  btn.setAttribute("aria-pressed", String(visible));
+  btn.setAttribute("aria-label", visible ? "Hide password" : "Show password");
+  btn.title = visible ? "Hide password" : "Show password";
+}
+$("#togglePasswordBtn").addEventListener("click", () => {
+  setPasswordVisible($("#loginPassword").type === "password");
+  $("#loginPassword").focus();
+});
+$("#loginForm").addEventListener("reset", () => setPasswordVisible(false));
 
 // Two companies share this app, each with its own cheques, tasks and staff. The button tapped says which one.
 function lastWorkspace() {

@@ -56,7 +56,13 @@
         <input type="text" id="loginUsername" required autocomplete="username" placeholder="admin or employee">
       </label>
       <label>Password
-        <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••">
+        <span class="password-field">
+          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••">
+          <button type="button" id="togglePasswordBtn" class="password-toggle" aria-label="Show password" aria-pressed="false" title="Show password">
+            <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </span>
       </label>
       <div class="login-row">
         <label class="checkbox-label"><input type="checkbox" id="rememberMe" checked> Remember me</label>
@@ -64,8 +70,12 @@
       </div>
       <p id="loginError" class="login-error hidden"></p>
       <div class="login-workspaces">
-        <button type="button" class="primary full-width" data-workspace="swk">Login to SWK</button>
-        <button type="button" class="primary full-width" data-workspace="betterway">Login to Betterway</button>
+        <div class="login-option login-option-swk">
+          <button type="button" class="primary full-width login-swk" data-workspace="swk">Login to SWK</button>
+        </div>
+        <div class="login-option login-option-betterway">
+          <button type="button" class="primary full-width login-betterway" data-workspace="betterway">Login to Betterway</button>
+        </div>
       </div>
     </form>
   </div>
@@ -317,7 +327,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v36</div>
+<div id="appVersion" class="app-version hidden">v37</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>
