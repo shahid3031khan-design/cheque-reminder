@@ -171,6 +171,39 @@ function randomizeLoginClipart() {
 $("#loginClipart").addEventListener("click", randomizeLoginClipart);
 randomizeLoginClipart();
 
+// ---------- No pinch-zoom ----------
+// iPhones ignore `user-scalable=no`, so the pinch gesture is stopped here as well (the page still scrolls normally).
+["gesturestart", "gesturechange", "gestureend"].forEach((name) => {
+  document.addEventListener(name, (e) => e.preventDefault(), { passive: false });
+});
+document.addEventListener("touchmove", (e) => {
+  if (e.touches && e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
+// ---------- Light / dark mode ----------
+// The saved choice is applied before the page paints (see the head of index.html); this keeps the switches in step
+// and handles taps. Light is the default; the choice is remembered on this device.
+
+function currentTheme() {
+  return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+}
+
+function applyTheme(theme, remember) {
+  if (theme === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+  document.querySelectorAll("[data-theme-toggle]").forEach((btn) => btn.setAttribute("aria-checked", String(theme === "dark")));
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#15141f" : "#fdf9f6");
+  if (remember) {
+    try { localStorage.setItem("theme", theme); } catch {}
+  }
+}
+
+document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+  btn.addEventListener("click", () => applyTheme(currentTheme() === "dark" ? "light" : "dark", true));
+});
+applyTheme(currentTheme(), false);
+
 // ---------- Auth / bootstrap ----------
 
 function showLoginScreen() {
@@ -192,7 +225,40 @@ function showLoginScreen() {
 function showApp() {
   $("#loginScreen").classList.add("hidden");
   $("#appRoot").classList.remove("hidden");
+  updateNavIndicator(false); // put the bubble under the right tab straight away (the bar was hidden until now)
 }
+
+// ---------- Bottom bar: the raised bubble follows the active tab ----------
+// The bar's CSS animates --nav-x (the active tab's centre), and the bubble and the bite taken out of the bar both
+// read it, so they glide together. The bubble carries a copy of the active tab's icon.
+function updateNavIndicator(animate = true) {
+  const inner = document.querySelector(".bottom-nav-inner");
+  if (!inner) return;
+  const active = inner.querySelector(".nav-item.active");
+  if (!active || active.offsetWidth === 0) return; // not on screen yet (signed out), or that tab is hidden
+  const x = active.offsetLeft + active.offsetWidth / 2;
+  if (!animate) inner.classList.add("nav-no-anim");
+  inner.style.setProperty("--nav-x", `${x}px`);
+  if (!animate) {
+    void inner.offsetWidth; // apply the jump now, then switch the animation back on
+    inner.classList.remove("nav-no-anim");
+  }
+  const icon = active.querySelector(".nav-icon");
+  const slot = inner.querySelector(".nav-bubble-icon");
+  const which = active.dataset.nav || "";
+  if (icon && slot && slot.dataset.nav !== which) {
+    slot.innerHTML = icon.innerHTML;
+    slot.dataset.nav = which;
+    if (animate && slot.animate) {
+      slot.animate(
+        [{ transform: "scale(0.55)", opacity: 0.2 }, { transform: "scale(1.12)", opacity: 1, offset: 0.6 }, { transform: "scale(1)", opacity: 1 }],
+        { duration: 420, easing: "ease-out" }
+      );
+    }
+  }
+}
+window.addEventListener("resize", () => updateNavIndicator(false));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => updateNavIndicator(false));
 
 function updateAddBtnVisibility() {
   const view = state.currentView;
@@ -251,8 +317,8 @@ function applyWorkspaceUI() {
   // fit side by side, so the bar stacks icon over label.
   $("#navMortgageBtn").classList.toggle("hidden", !betterway);
   $("#navNocsBtn").classList.toggle("hidden", betterway);
-  document.querySelector(".bottom-nav-inner").classList.add("nav-compact");
   if (state.currentView === (betterway ? "nocs" : "mortgage")) switchView("home");
+  updateNavIndicator(false); // a tab appeared or disappeared, so the others shift sideways
 }
 
 $("#workspaceSwitchBtn").addEventListener("click", async () => {
@@ -285,6 +351,7 @@ function switchView(view) {
   document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.nav === view);
   });
+  updateNavIndicator();
   if (view === "tracker") openTrackerView();
   if (view === "tasks") openTasksView();
   if (view === "calls") openCallsView();

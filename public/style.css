@@ -61,7 +61,7 @@ body {
 .app {
   max-width: 480px;
   margin: 0 auto;
-  padding: 20px 16px calc(120px + env(safe-area-inset-bottom));
+  padding: 20px 16px calc(140px + env(safe-area-inset-bottom));
 }
 
 /* ---------- Topbar ---------- */
@@ -431,7 +431,7 @@ button svg { vertical-align: middle; }
 .fab-pill {
   position: fixed;
   right: 20px;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  bottom: calc(122px + env(safe-area-inset-bottom));
   z-index: 40;
   display: flex;
   align-items: center;
@@ -1381,10 +1381,6 @@ select {
 .tracker-tab.active,
 .tasks-tab.active { background: var(--yellow); color: var(--yellow-text); }
 
-/* Betterway's bottom bar has an extra item: stack icon over label so six fit on a phone */
-.bottom-nav-inner.nav-compact { padding: 8px 6px; max-width: 380px; }
-.bottom-nav-inner.nav-compact .nav-item { flex-direction: column; gap: 2px; padding: 6px 5px; }
-.bottom-nav-inner.nav-compact .nav-label { font-size: 0.58rem; }
 
 /* NOCs (SWK) */
 #addNocBtn { margin-bottom: 10px; }
@@ -1759,4 +1755,226 @@ select {
   line-height: 1;
   padding: 0 0 0 4px;
   flex-shrink: 0;
+}
+
+/* ---------- Dark mode ---------- */
+/* Switched by the sun/moon toggle (sign-in card, and "My account"); the choice is remembered on the device. */
+:root[data-theme="dark"] {
+  color-scheme: dark; /* date/time pickers, scrollbars and form controls follow */
+  --bg-gradient: linear-gradient(160deg, #15141f 0%, #1b1a2b 50%, #231f3a 100%);
+  --bg: #1b1a2b;
+  --panel: #262439;
+  --text: #ecebf7;
+  --text-muted: #a3a1b8;
+  --border: rgba(255, 255, 255, 0.10);
+
+  --yellow: #7b6df0;
+  --yellow-dark: #a79cff;
+  --yellow-soft: rgba(123, 109, 240, 0.20);
+  --yellow-text: #ffffff;
+
+  --warning: #f0b04f;
+  --warning-dark: #f5c273;
+  --warning-soft: rgba(240, 176, 79, 0.18);
+  --success: #5cc460;
+  --success-soft: rgba(92, 196, 96, 0.18);
+  --red: #f0647f;
+  --red-soft: rgba(240, 100, 127, 0.18);
+  --gray-soft: rgba(255, 255, 255, 0.08);
+
+  --icon-mint: #5cc460;
+  --icon-mint-bg: rgba(92, 196, 96, 0.18);
+  --icon-blue: #6aa8f0;
+  --icon-blue-bg: rgba(106, 168, 240, 0.18);
+  --icon-purple: #b48cf0;
+  --icon-purple-bg: rgba(180, 140, 240, 0.20);
+
+  --glass-bg: rgba(34, 32, 52, 0.82);
+  --glass-card-bg: rgba(40, 38, 60, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .app-version { color: rgba(255, 255, 255, 0.4); }
+:root[data-theme="dark"] .login-option-swk { background: rgba(232, 69, 44, 0.14); border-color: rgba(232, 69, 44, 0.38); }
+:root[data-theme="dark"] .login-option-betterway { background: rgba(110, 140, 255, 0.14); border-color: rgba(110, 140, 255, 0.38); }
+:root[data-theme="dark"] .workspace-chip[data-workspace="swk"] { background: rgba(232, 69, 44, 0.22); color: #ff9b86; }
+:root[data-theme="dark"] .workspace-chip[data-workspace="betterway"] { background: rgba(110, 140, 255, 0.22); color: #b9ccff; }
+:root[data-theme="dark"] .mortgage-grid > div { background: rgba(255, 255, 255, 0.06); }
+:root[data-theme="dark"] .login-illustration { opacity: 0.92; }
+
+/* The sun / moon switch: dark = black pill, white knob on the left, moon on the right;
+   light = pale pill, sun on the left, dark knob on the right (the current mode is what you see). */
+.theme-toggle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 68px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #dedee4 0%, #f6f6f9 100%);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.22), 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: background 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-toggle:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.theme-toggle-knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #55555b 0%, #1c1c20 70%);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  transform: translateX(34px);
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+.theme-toggle-icon {
+  position: absolute;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+.theme-toggle-icon svg { width: 18px; height: 18px; }
+.theme-toggle-sun { left: 8px; color: #2b2b30; opacity: 1; }
+.theme-toggle-moon { right: 8px; color: #fff; opacity: 0; }
+.theme-toggle[aria-checked="true"] { background: linear-gradient(180deg, #121215 0%, #2c2c33 100%); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.08); }
+.theme-toggle[aria-checked="true"] .theme-toggle-knob { transform: translateX(0); background: radial-gradient(circle at 35% 30%, #ffffff 0%, #d8d8de 80%); }
+.theme-toggle[aria-checked="true"] .theme-toggle-sun { opacity: 0; }
+.theme-toggle[aria-checked="true"] .theme-toggle-moon { opacity: 1; }
+
+.login-card { position: relative; }
+.login-theme-toggle { position: absolute; top: 16px; right: 16px; width: 60px; height: 30px; }
+.login-theme-toggle .theme-toggle-knob { top: 3px; left: 3px; width: 24px; height: 24px; transform: translateX(30px); }
+.login-theme-toggle[aria-checked="true"] .theme-toggle-knob { transform: translateX(0); }
+.login-theme-toggle .theme-toggle-icon { width: 18px; height: 18px; margin-top: -9px; }
+.login-theme-toggle .theme-toggle-icon svg { width: 16px; height: 16px; }
+
+.account-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 14px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--yellow-soft);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* ---------- No pinch-zoom ---------- */
+/* The app is used like a phone app, so the page can't be stretched with two fingers or zoomed with a double tap
+   (scrolling still works). The viewport tag in index.html and the gesture handlers in app.js back this up for
+   iPhones, which ignore the usual setting. */
+html, body { touch-action: pan-x pan-y; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* The small switch in the top bar (inside the portal). It wraps under the name badge on a phone. */
+.topbar-right { flex-wrap: wrap; justify-content: flex-end; row-gap: 8px; }
+.theme-toggle-sm { width: 60px; height: 30px; }
+.theme-toggle-sm .theme-toggle-knob { top: 3px; left: 3px; width: 24px; height: 24px; transform: translateX(30px); }
+.theme-toggle-sm[aria-checked="true"] .theme-toggle-knob { transform: translateX(0); }
+.theme-toggle-sm .theme-toggle-icon { width: 18px; height: 18px; margin-top: -9px; }
+.theme-toggle-sm .theme-toggle-icon svg { width: 16px; height: 16px; }
+.topbar-theme-toggle { margin-left: auto; }
+.topbar-right { flex-direction: column; align-items: flex-end; flex-wrap: nowrap; gap: 8px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.topbar-theme-toggle { margin-left: 0; }
+
+/* ---------- Bottom navigation: raised bubble that glides to the active tab ---------- */
+/* --nav-x is the active tab's centre (set from app.js). Registering it lets the browser animate it, so the
+   bubble and the notch cut into the bar move together, smoothly. */
+@property --nav-x {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+.bottom-nav { padding: 0 12px calc(14px + env(safe-area-inset-bottom)); }
+.bottom-nav-inner {
+  max-width: 440px;
+  height: 66px;
+  padding: 0 4px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  align-items: stretch;
+  justify-content: space-between;
+  transition: --nav-x 0.45s cubic-bezier(0.34, 1.25, 0.5, 1); /* a touch of overshoot, then settles */
+}
+.bottom-nav-inner.nav-no-anim { transition: none; }
+
+/* the bar itself, with a round bite taken out where the bubble sits; drop-shadow follows that shape */
+.nav-surface-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 -1px 6px rgba(60, 40, 120, 0.08)) drop-shadow(0 10px 18px rgba(60, 40, 120, 0.18));
+}
+.nav-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: var(--panel);
+  -webkit-mask: radial-gradient(circle 35px at var(--nav-x) 0, transparent 34.2px, #000 35.2px);
+  mask: radial-gradient(circle 35px at var(--nav-x) 0, transparent 34.2px, #000 35.2px);
+}
+
+/* the raised circle that carries the active tab's icon */
+.nav-bubble {
+  position: absolute;
+  z-index: 2;
+  top: -28px;
+  left: 0;
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  transform: translateX(var(--nav-x));
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(108, 93, 211, 0.30);
+  pointer-events: none;
+}
+.nav-bubble-icon { display: flex; }
+.nav-bubble-icon svg { width: 25px; height: 25px; display: block; }
+
+.nav-item {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 2px 10px;
+  border-radius: 16px;
+  background: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease;
+}
+.nav-item .nav-icon svg { width: 22px; height: 22px; transition: transform 0.35s cubic-bezier(0.34, 1.25, 0.5, 1), opacity 0.2s ease; }
+.nav-item .nav-label { font-size: 0.64rem; font-weight: 600; transition: color 0.25s ease; }
+.nav-item.active { background: none; box-shadow: none; color: var(--text); }
+.nav-item.active .nav-label { font-weight: 800; }
+.nav-item.active .nav-icon svg { opacity: 0; transform: translateY(-12px) scale(0.5); } /* it moves up into the bubble */
+:root[data-theme="dark"] .nav-bubble { box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.07); }
+:root[data-theme="dark"] .nav-surface-wrap { filter: drop-shadow(0 -1px 6px rgba(0, 0, 0, 0.3)) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.5)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-inner, .nav-item .nav-icon svg, .nav-item, .nav-item .nav-label { transition: none; }
 }
