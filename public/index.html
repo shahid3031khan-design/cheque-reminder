@@ -289,6 +289,41 @@
     </div>
   </div>
 
+  <div id="mortgageView" class="hidden">
+    <div class="tracker-header">
+      <h2>Mortgage calculator</h2>
+    </div>
+
+    <div class="tracker-day-panel">
+      <form id="mortgageForm" autocomplete="off" novalidate>
+        <label>Property price <span class="mortgage-unit" id="mortgageCurrency"></span>
+          <input type="number" id="mortgagePrice" min="0" step="any" inputmode="decimal" value="1000000">
+        </label>
+        <div class="form-row">
+          <label>Down payment
+            <input type="number" id="mortgageDown" min="0" step="any" inputmode="decimal" value="20">
+          </label>
+          <label>Enter as
+            <select id="mortgageDownUnit">
+              <option value="percent">% of price</option>
+              <option value="amount">An amount</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>Loan term (years)
+            <input type="number" id="mortgageYears" min="1" max="40" step="1" inputmode="numeric" value="25">
+          </label>
+          <label>Rate (% a year)
+            <input type="number" id="mortgageRate" min="0" max="30" step="0.01" inputmode="decimal" value="4.5">
+          </label>
+        </div>
+      </form>
+    </div>
+
+    <div class="mortgage-result" id="mortgageResult" aria-live="polite"></div>
+  </div>
+
   <div id="callsView" class="hidden">
     <div class="tracker-header">
       <h2>Calls</h2>
@@ -353,6 +388,10 @@
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 4 6a2 2 0 0 1 0-2Z"/></svg></span>
       <span class="nav-label">Calls</span>
     </button>
+    <button class="nav-item hidden" id="navMortgageBtn" data-nav="mortgage">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="2.5"/><rect x="7.5" y="6" width="9" height="3.5" rx="1"/><circle cx="8.5" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="15.5" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/></svg></span>
+      <span class="nav-label">Mortgage</span>
+    </button>
     <button class="nav-item" id="navRightBtn">
       <span class="nav-icon" id="navRightIcon"></span>
       <span class="nav-label" id="navRightLabel">Settings</span>
@@ -360,7 +399,7 @@
   </div>
 </nav>
 
-<div id="appVersion" class="app-version hidden">v39</div>
+<div id="appVersion" class="app-version hidden">v40</div>
 
 <button id="addBtn" class="fab-pill hidden" aria-label="Add cheque">
   <span class="fab-pill-icon">+</span>

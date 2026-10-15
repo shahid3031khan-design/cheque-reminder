@@ -1381,6 +1381,61 @@ select {
 .tracker-tab.active,
 .tasks-tab.active { background: var(--yellow); color: var(--yellow-text); }
 
+/* Betterway's bottom bar has an extra item: stack icon over label so six fit on a phone */
+.bottom-nav-inner.nav-compact { padding: 8px 6px; max-width: 380px; }
+.bottom-nav-inner.nav-compact .nav-item { flex-direction: column; gap: 2px; padding: 6px 5px; }
+.bottom-nav-inner.nav-compact .nav-label { font-size: 0.58rem; }
+
+/* Mortgage calculator (Betterway) */
+.mortgage-unit { color: var(--text-muted); font-weight: 600; }
+#mortgageForm .form-row > label { min-width: 0; }
+#mortgageForm input, #mortgageForm select { width: 100%; min-width: 0; box-sizing: border-box; }
+.mortgage-result {
+  margin-top: 14px;
+  padding: 16px;
+  background: var(--glass-card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.mortgage-headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 10px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #3b4a93 0%, #1e2761 100%);
+  color: #fff;
+  box-shadow: inset 0 -3px 0 #c9a227;
+}
+.mortgage-headline-label { font-size: 0.74rem; font-weight: 600; opacity: 0.85; }
+.mortgage-headline-value { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.01em; }
+.mortgage-headline-sub { font-size: 0.74rem; opacity: 0.8; }
+.mortgage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mortgage-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f4f6fd;
+}
+.mortgage-grid span { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); }
+.mortgage-grid strong { font-size: 0.92rem; font-weight: 800; }
+.mortgage-grid em { font-style: normal; font-weight: 600; color: var(--text-muted); font-size: 0.78rem; }
+.mortgage-years { margin-top: 14px; }
+.mortgage-years summary { cursor: pointer; font-size: 0.84rem; font-weight: 700; color: var(--yellow-dark); }
+.mortgage-years table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 0.76rem; }
+.mortgage-years th { text-align: right; padding: 6px 4px; color: var(--text-muted); font-weight: 700; }
+.mortgage-years td { text-align: right; padding: 6px 4px; border-top: 1px solid var(--border); }
+.mortgage-years th:first-child, .mortgage-years td:first-child { text-align: left; }
+.mortgage-note { margin: 12px 0 0; }
+.mortgage-problem { margin: 0; color: var(--red); font-weight: 600; font-size: 0.88rem; }
+
 /* Meetings (under Tasks) */
 #scheduleMeetingBtn { margin-bottom: 4px; }
 .meetings-hint { margin: 6px 2px 14px; }

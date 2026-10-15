@@ -245,6 +245,11 @@ function applyWorkspaceUI() {
   $("#trackerPipelineTab").classList.toggle("hidden", betterway);
   $("#trackerAchievementTab").classList.toggle("hidden", !betterway);
   if (state.trackerTab === (betterway ? "pipeline" : "achievement")) setTrackerTab("daily");
+
+  // The mortgage calculator is Betterway's only. Six items don't fit side by side, so the bar stacks icon over label.
+  $("#navMortgageBtn").classList.toggle("hidden", !betterway);
+  document.querySelector(".bottom-nav-inner").classList.toggle("nav-compact", betterway);
+  if (!betterway && state.currentView === "mortgage") switchView("home");
 }
 
 $("#workspaceSwitchBtn").addEventListener("click", async () => {
@@ -261,11 +266,14 @@ $("#workspaceSwitchBtn").addEventListener("click", async () => {
 });
 
 function switchView(view) {
+  // The mortgage calculator belongs to Betterway only.
+  if (view === "mortgage" && state.currentUser?.workspace !== "betterway") view = "home";
   state.currentView = view;
   $("#homeView").classList.toggle("hidden", view !== "home");
   $("#trackerView").classList.toggle("hidden", view !== "tracker");
   $("#tasksView").classList.toggle("hidden", view !== "tasks");
   $("#callsView").classList.toggle("hidden", view !== "calls");
+  $("#mortgageView").classList.toggle("hidden", view !== "mortgage");
   $("#pageTitle").classList.toggle("hidden", view !== "home");
   $("#pageTagline").classList.toggle("hidden", view !== "home");
   updateAddBtnVisibility();
@@ -275,6 +283,7 @@ function switchView(view) {
   if (view === "tracker") openTrackerView();
   if (view === "tasks") openTasksView();
   if (view === "calls") openCallsView();
+  if (view === "mortgage") renderMortgage();
 }
 
 document.querySelectorAll(".nav-item[data-nav]").forEach((btn) => {
@@ -1679,6 +1688,102 @@ $("#meetingForm").addEventListener("submit", async (e) => {
     $("#meetingStatus").classList.remove("hidden");
   }
 });
+
+// ---------- Mortgage calculator (Betterway) ----------
+
+// Standard repayment mortgage: the same payment every month, interest charged on the balance left.
+function mortgageSchedule({ loan, years, annualRate }) {
+  const months = Math.round(years * 12);
+  const r = annualRate / 100 / 12;
+  const payment = r === 0 ? loan / months : (loan * r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1);
+  const rows = [];
+  let balance = loan;
+  let yearInterest = 0;
+  let yearPrincipal = 0;
+  for (let m = 1; m <= months; m++) {
+    const interest = balance * r;
+    const principal = Math.min(payment - interest, balance);
+    balance -= principal;
+    yearInterest += interest;
+    yearPrincipal += principal;
+    if (m % 12 === 0 || m === months) {
+      rows.push({ year: Math.ceil(m / 12), interest: yearInterest, principal: yearPrincipal, balance: Math.max(balance, 0) });
+      yearInterest = 0;
+      yearPrincipal = 0;
+    }
+  }
+  return { months, payment, rows, totalInterest: payment * months - loan };
+}
+
+function mortgageInputs() {
+  const price = parseFloat($("#mortgagePrice").value);
+  const downRaw = parseFloat($("#mortgageDown").value);
+  const years = parseFloat($("#mortgageYears").value);
+  const annualRate = parseFloat($("#mortgageRate").value);
+  const asPercent = $("#mortgageDownUnit").value === "percent";
+  const down = Number.isFinite(downRaw) ? (asPercent ? (price * downRaw) / 100 : downRaw) : 0;
+  return { price, down, years, annualRate, downPercent: price > 0 ? (down / price) * 100 : 0 };
+}
+
+function renderMortgage() {
+  const symbol = (state.config && state.config.currencySymbol) || "";
+  $("#mortgageCurrency").textContent = symbol.trim() ? `(${symbol.trim()})` : "";
+  const money = (n) => `${symbol}${Math.round(n).toLocaleString()}`;
+  const box = $("#mortgageResult");
+  const { price, down, years, annualRate, downPercent } = mortgageInputs();
+
+  let problem = "";
+  if (!(price > 0)) problem = "Enter the property price.";
+  else if (!(down >= 0) || down >= price) problem = "The down payment has to be less than the property price.";
+  else if (!(years >= 1 && years <= 40)) problem = "The loan term has to be between 1 and 40 years.";
+  else if (!(annualRate >= 0 && annualRate <= 30)) problem = "The interest rate has to be between 0% and 30%.";
+  if (problem) {
+    box.innerHTML = `<p class="mortgage-problem">${escapeHtml(problem)}</p>`;
+    return;
+  }
+
+  const loan = price - down;
+  const plan = mortgageSchedule({ loan, years, annualRate });
+  const ltv = (loan / price) * 100;
+  box.innerHTML = `
+    <div class="mortgage-headline">
+      <span class="mortgage-headline-label">Monthly payment</span>
+      <span class="mortgage-headline-value">${money(plan.payment)}</span>
+      <span class="mortgage-headline-sub">for ${plan.months} months at ${annualRate}% a year</span>
+    </div>
+    <div class="mortgage-grid">
+      <div><span>Loan amount</span><strong>${money(loan)}</strong></div>
+      <div><span>Down payment</span><strong>${money(down)} <em>(${downPercent.toFixed(1)}%)</em></strong></div>
+      <div><span>Total interest</span><strong>${money(plan.totalInterest)}</strong></div>
+      <div><span>Total repaid</span><strong>${money(loan + plan.totalInterest)}</strong></div>
+      <div><span>Loan to value</span><strong>${ltv.toFixed(1)}%</strong></div>
+      <div><span>Interest share</span><strong>${((plan.totalInterest / (loan + plan.totalInterest)) * 100).toFixed(1)}%</strong></div>
+    </div>
+    <details class="mortgage-years">
+      <summary>Year-by-year breakdown</summary>
+      <table>
+        <thead><tr><th>Year</th><th>Principal</th><th>Interest</th><th>Balance</th></tr></thead>
+        <tbody>${plan.rows.map((row) => `<tr><td>${row.year}</td><td>${money(row.principal)}</td><td>${money(row.interest)}</td><td>${money(row.balance)}</td></tr>`).join("")}</tbody>
+      </table>
+    </details>
+    <p class="hint mortgage-note">An estimate for a fixed rate with equal monthly payments. A bank's offer may differ (fees, rate changes, insurance).</p>`;
+}
+
+["#mortgagePrice", "#mortgageDown", "#mortgageYears", "#mortgageRate"].forEach((sel) => $(sel).addEventListener("input", renderMortgage));
+let mortgageDownUnitBefore = "percent";
+$("#mortgageDownUnit").addEventListener("change", () => {
+  // Switching units converts the number, so the same down payment stays on screen.
+  const price = parseFloat($("#mortgagePrice").value);
+  const raw = parseFloat($("#mortgageDown").value);
+  const nowUnit = $("#mortgageDownUnit").value;
+  if (price > 0 && Number.isFinite(raw)) {
+    const amount = mortgageDownUnitBefore === "percent" ? (price * raw) / 100 : raw;
+    $("#mortgageDown").value = nowUnit === "percent" ? +((amount / price) * 100).toFixed(2) : Math.round(amount);
+  }
+  mortgageDownUnitBefore = nowUnit;
+  renderMortgage();
+});
+$("#mortgageForm").addEventListener("submit", (e) => e.preventDefault());
 
 // ---------- Calls (employee logs each call they make) ----------
 
